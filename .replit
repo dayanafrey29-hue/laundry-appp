@@ -66,7 +66,6 @@ externalPort = 3002
 channel = "stable-25_05"
 
 [deployment]
-deploymentTarget = "static"
+deploymentTarget = "cloudrun"
 run = ["sh", "-c", "node server.js"]
 build = ["sh", "-c", "npm run build"]
-publicDir = "dist"

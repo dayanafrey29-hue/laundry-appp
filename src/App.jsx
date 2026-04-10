@@ -1,9 +1,6 @@
 import { useState, useEffect, useRef } from "react";
+import { supabase } from './supabaseClient'; // ПІДКЛЮЧАЄМО SUPABASE
 
-const STORAGE_KEY  = "laundry-v4-records";
-const APT_KEY      = "laundry-v4-apartments";
-const MAIDS_KEY    = "laundry-v4-maids";
-const LINEN_KEY    = "laundry-v4-linen";
 const SETTINGS_PASSWORD = "2026";
 
 const DEFAULT_LINEN = [
@@ -52,35 +49,6 @@ function compressImage(file, maxPx = 1400, quality = 0.82) {
   });
 }
 
-const KEY_MAP = {
-  [STORAGE_KEY]: "records",
-  [APT_KEY]:     "apts",
-  [MAIDS_KEY]:   "maids",
-  [LINEN_KEY]:   "linen",
-};
-
-function lsGet(key) { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : null; } catch { return null; } }
-function lsSet(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch {} }
-
-async function apiGet() {
-  try {
-    const r = await fetch("/api/data");
-    if (!r.ok) throw new Error();
-    const { data } = await r.json();
-    return data;
-  } catch { return null; }
-}
-
-async function apiSync(apiKey, value) {
-  try {
-    await fetch("/api/sync", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key: apiKey, value }),
-    });
-  } catch {}
-}
-
 // ─── ROOT ────────────────────────────────────────────────────────
 export default function App() {
   const [tab, setTab]         = useState("log");
@@ -92,47 +60,33 @@ export default function App() {
   const [syncBanner, setSyncBanner] = useState(false);
   const [online, setOnline]   = useState(true);
 
+  // ЗАВАНТАЖЕННЯ ДАНИХ З SUPABASE ПРИ ЗАПУСКУ
   useEffect(() => {
-    (async () => {
-      const remote = await apiGet();
-      if (remote) {
-        const r = remote.records ?? lsGet(STORAGE_KEY) ?? [];
-        const a = remote.apts    ?? lsGet(APT_KEY)     ?? DEFAULT_APTS;
-        const m = remote.maids   ?? lsGet(MAIDS_KEY)   ?? DEFAULT_MAIDS;
-        const l = remote.linen   ?? lsGet(LINEN_KEY)   ?? DEFAULT_LINEN;
-        setRecords(r); setApts(a); setMaids(m); setLinen(l);
-        lsSet(STORAGE_KEY, r); lsSet(APT_KEY, a); lsSet(MAIDS_KEY, m); lsSet(LINEN_KEY, l);
-      } else {
-        setRecords(lsGet(STORAGE_KEY) ?? []);
-        setApts(lsGet(APT_KEY)    ?? DEFAULT_APTS);
-        setMaids(lsGet(MAIDS_KEY) ?? DEFAULT_MAIDS);
-        setLinen(lsGet(LINEN_KEY) ?? DEFAULT_LINEN);
+    async function loadInitialData() {
+      try {
+        const { data, error } = await supabase
+          .from('laundry_store')
+          .select('*');
+
+        if (error) throw error;
+
+        // Розбираємо дані з таблиці (ми зберігаємо їх по ключам)
+        const dbRecords = data.find(d => d.key === 'records')?.value || [];
+        const dbApts    = data.find(d => d.key === 'apts')?.value    || DEFAULT_APTS;
+        const dbMaids   = data.find(d => d.key === 'maids')?.value   || DEFAULT_MAIDS;
+        const dbLinen   = data.find(d => d.key === 'linen')?.value   || DEFAULT_LINEN;
+
+        setRecords(dbRecords);
+        setApts(dbApts);
+        setMaids(dbMaids);
+        setLinen(dbLinen);
+        setOnline(true);
+      } catch (err) {
+        console.error("Помилка завантаження:", err);
         setOnline(false);
       }
-    })();
-
-    const es = new EventSource("/api/events");
-    es.onmessage = (e) => {
-      try {
-        const { key, value } = JSON.parse(e.data);
-        if (key === "records") { setRecords(value); lsSet(STORAGE_KEY, value); }
-        if (key === "apts")    { setApts(value);    lsSet(APT_KEY, value); }
-        if (key === "maids")   { setMaids(value);   lsSet(MAIDS_KEY, value); }
-        if (key === "linen")   { setLinen(value);   lsSet(LINEN_KEY, value); }
-        showSync();
-      } catch {}
-    };
-    es.onerror = () => setOnline(false);
-    es.onopen  = () => setOnline(true);
-
-    function onStorage(e) {
-      if (e.key === STORAGE_KEY) { setRecords(e.newValue ? JSON.parse(e.newValue) : []); showSync(); }
-      if (e.key === APT_KEY)     { setApts(e.newValue   ? JSON.parse(e.newValue) : DEFAULT_APTS); showSync(); }
-      if (e.key === MAIDS_KEY)   { setMaids(e.newValue  ? JSON.parse(e.newValue) : DEFAULT_MAIDS); showSync(); }
-      if (e.key === LINEN_KEY)   { setLinen(e.newValue  ? JSON.parse(e.newValue) : DEFAULT_LINEN); showSync(); }
     }
-    window.addEventListener("storage", onStorage);
-    return () => { es.close(); window.removeEventListener("storage", onStorage); };
+    loadInitialData();
   }, []);
 
   function showSync() {
@@ -140,10 +94,25 @@ export default function App() {
     setTimeout(() => setSyncBanner(false), 2500);
   }
 
-  function saveRecords(list) { setRecords(list); lsSet(STORAGE_KEY, list); apiSync("records", list); }
-  function saveApts(list)    { const sorted = [...list].sort((a,b)=>a.localeCompare(b,"ru",{numeric:true})); setApts(sorted); lsSet(APT_KEY, sorted); apiSync("apts", sorted); }
-  function saveMaids(list)   { setMaids(list);   lsSet(MAIDS_KEY, list);   apiSync("maids", list); }
-  function saveLinen(list)   { setLinen(list);   lsSet(LINEN_KEY, list);   apiSync("linen", list); }
+  // ФУНКЦІЇ СИНХРОНІЗАЦІЇ З SUPABASE
+  async function syncWithDB(key, value) {
+    try {
+      const { error } = await supabase
+        .from('laundry_store')
+        .upsert({ key: key, value: value });
+
+      if (error) throw error;
+      showSync();
+    } catch (err) {
+      console.error("Помилка синхронізації:", err);
+      setOnline(false);
+    }
+  }
+
+  function saveRecords(list) { setRecords(list); syncWithDB("records", list); }
+  function saveApts(list)    { const sorted = [...list].sort((a,b)=>a.localeCompare(b,"ru",{numeric:true})); setApts(sorted); syncWithDB("apts", sorted); }
+  function saveMaids(list)   { setMaids(list); syncWithDB("maids", list); }
+  function saveLinen(list)   { setLinen(list); syncWithDB("linen", list); }
 
   if (!apts || !maids || !linen) return (
     <div style={{...s.root,display:"flex",alignItems:"center",justifyContent:"center",color:"#555"}}>Загрузка…</div>
@@ -157,8 +126,8 @@ export default function App() {
           <div style={s.headerTitle}>Учёт белья</div>
           <div style={s.headerSub}>Журнал прачечной</div>
         </div>
-        {!online && <div style={s.offlinePill}>⚠️ Офлайн (нет связи)</div>}
-        {online  && <div style={{...s.syncPill, opacity: syncBanner ? 1 : 0}}>🔄 Синхронизировано</div>}
+        {!online && <div style={s.offlinePill}>⚠️ Офлайн (проблема с БД)</div>}
+        {online  && <div style={{...s.syncPill, opacity: syncBanner ? 1 : 0}}>🔄 Данные сохранены</div>}
       </div>
 
       <div style={s.tabBar}>
@@ -619,7 +588,7 @@ function ListEditor({ items, saveItems, addPlaceholder, sortAlpha }) {
 }
 
 // ─── LINEN EDITOR ────────────────────────────────────────────────
-const ICON_OPTIONS = ["🛏","🟫","🌿","🪣","⬜","🧣","🪟","🍽","👕","🩱","🧤","🧦","🛁","🚿","🪥","📦"];
+const ICON_OPTIONS = ["🛏","🪽","☁️","🧺","🫶🏻","🦵🏼","💗","🐾","🍓","🍽️","🍍","🍑","🛁","✨","🌸","🦄"];
 
 function LinenEditor({ linen, saveLinen }) {
   const [newLabel, setNewLabel]         = useState("");
