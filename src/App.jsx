@@ -61,33 +61,21 @@ export default function App() {
   const [online, setOnline]   = useState(true);
 
   // ЗАВАНТАЖЕННЯ ДАНИХ З SUPABASE ПРИ ЗАПУСКУ
-  useEffect(() => {
-    async function loadInitialData() {
-      try {
-        const { data, error } = await supabase
-          .from('laundry_store')
-          .select('*');
+        useEffect(() => {
+          const fetchHistory = async () => {
+            const { data, error } = await supabase
+              .from('laundry_records')
+              .select('*')
+              .order('created_at', { ascending: false });
 
-        if (error) throw error;
-
-        // Розбираємо дані з таблиці (ми зберігаємо їх по ключам)
-        const dbRecords = data.find(d => d.key === 'records')?.value || [];
-        const dbApts    = data.find(d => d.key === 'apts')?.value    || DEFAULT_APTS;
-        const dbMaids   = data.find(d => d.key === 'maids')?.value   || DEFAULT_MAIDS;
-        const dbLinen   = data.find(d => d.key === 'linen')?.value   || DEFAULT_LINEN;
-
-        setRecords(dbRecords);
-        setApts(dbApts);
-        setMaids(dbMaids);
-        setLinen(dbLinen);
-        setOnline(true);
-      } catch (err) {
-        console.error("Помилка завантаження:", err);
-        setOnline(false);
-      }
-    }
-    loadInitialData();
-  }, []);
+            if (!error && data) {
+              // Заміни setRecords на назву своєї функції оновлення історії
+              // Зазвичай це setRecords або setHistory
+              setRecords(data); 
+            }
+          };
+          fetchHistory();
+        }, []);
 
   function showSync() {
     setSyncBanner(true);
