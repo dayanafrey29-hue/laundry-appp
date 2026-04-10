@@ -69,4 +69,4 @@ channel = "stable-25_05"
 deploymentTarget = "static"
 run = ["sh", "-c", "node server.js"]
 publicDir = "dist"
-build = ["sh", "-c", "npm install && npm run build"]
+build = ["sh", "-c", "npm run build"]
