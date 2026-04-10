@@ -61,21 +61,20 @@ export default function App() {
   const [online, setOnline]   = useState(true);
 
   // ЗАВАНТАЖЕННЯ ДАНИХ З SUPABASE ПРИ ЗАПУСКУ
-        useEffect(() => {
-          const fetchHistory = async () => {
-            const { data, error } = await supabase
-              .from('laundry_records')
-              .select('*')
-              .order('created_at', { ascending: false });
+  useEffect(() => {
+    const fetchHistory = async () => {
+      const { data, error } = await supabase
+        .from('laundry_records')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-            if (!error && data) {
-              // Заміни setRecords на назву своєї функції оновлення історії
-              // Зазвичай це setRecords або setHistory
-              setRecords(data); 
-            }
-          };
-          fetchHistory();
-        }, []); //
+      if (!error && data) {
+        setRecords(data);
+      }
+    };
+    fetchHistory();
+  }, []);
+
 
   function showSync() {
     setSyncBanner(true);
