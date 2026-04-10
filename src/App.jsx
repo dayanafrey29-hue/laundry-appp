@@ -121,7 +121,7 @@ export default function App() {
   }
 
   function saveRecords(list) { setRecords(list); lsSet(STORAGE_KEY, list); apiSync("records", list); }
-  function saveApts(list)    { setApts(list);    lsSet(APT_KEY, list);     apiSync("apts", list); }
+  function saveApts(list)    { const sorted = [...list].sort((a,b)=>a.localeCompare(b,"ru",{numeric:true})); setApts(sorted); lsSet(APT_KEY, sorted); apiSync("apts", sorted); }
   function saveMaids(list)   { setMaids(list);   lsSet(MAIDS_KEY, list);   apiSync("maids", list); }
   function saveLinen(list)   { setLinen(list);   lsSet(LINEN_KEY, list);   apiSync("linen", list); }
 
@@ -347,11 +347,13 @@ function HistoryTab({ records, saveRecords, linen }) {
   const [expanded,setExpanded]     = useState(null);
   const [delId,setDelId]           = useState(null);
 
-  const filtered = records.filter(r=>{
-    const mA = !search     || r.apartment.toLowerCase().includes(search.toLowerCase());
-    const mD = !dateFilter || r.date===dateFilter;
-    return mA&&mD;
-  });
+  const filtered = records
+    .filter(r=>{
+      const mA = !search     || r.apartment.toLowerCase().includes(search.toLowerCase());
+      const mD = !dateFilter || r.date===dateFilter;
+      return mA&&mD;
+    })
+    .sort((a,b)=>(b.date||"").localeCompare(a.date||""));
 
   const linenTotal = l => Object.values(l||{}).reduce((sum,v)=>sum+(parseInt(v)||0),0);
 
