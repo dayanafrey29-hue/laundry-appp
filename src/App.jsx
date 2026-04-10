@@ -32,8 +32,34 @@ function fmtDate(d) {
 }
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
 
+const KEY_MAP = {
+  [STORAGE_KEY]: "records",
+  [APT_KEY]:     "apts",
+  [MAIDS_KEY]:   "maids",
+  [LINEN_KEY]:   "linen",
+};
+
 function lsGet(key) { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : null; } catch { return null; } }
 function lsSet(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch {} }
+
+async function apiGet() {
+  try {
+    const r = await fetch("/api/data");
+    if (!r.ok) throw new Error();
+    const { data } = await r.json();
+    return data;
+  } catch { return null; }
+}
+
+async function apiSync(apiKey, value) {
+  try {
+    await fetch("/api/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: apiKey, value }),
+    });
+  } catch {}
+}
 
 // ─── ROOT ────────────────────────────────────────────────────────
 export default function App() {
@@ -44,12 +70,40 @@ export default function App() {
   const [linen, setLinen]     = useState(null);
   const [settingsUnlocked, setSettingsUnlocked] = useState(false);
   const [syncBanner, setSyncBanner] = useState(false);
+  const [online, setOnline]   = useState(true);
 
   useEffect(() => {
-    setRecords(lsGet(STORAGE_KEY) ?? []);
-    setApts(lsGet(APT_KEY)    ?? DEFAULT_APTS);
-    setMaids(lsGet(MAIDS_KEY) ?? DEFAULT_MAIDS);
-    setLinen(lsGet(LINEN_KEY) ?? DEFAULT_LINEN);
+    (async () => {
+      const remote = await apiGet();
+      if (remote) {
+        const r = remote.records ?? lsGet(STORAGE_KEY) ?? [];
+        const a = remote.apts    ?? lsGet(APT_KEY)     ?? DEFAULT_APTS;
+        const m = remote.maids   ?? lsGet(MAIDS_KEY)   ?? DEFAULT_MAIDS;
+        const l = remote.linen   ?? lsGet(LINEN_KEY)   ?? DEFAULT_LINEN;
+        setRecords(r); setApts(a); setMaids(m); setLinen(l);
+        lsSet(STORAGE_KEY, r); lsSet(APT_KEY, a); lsSet(MAIDS_KEY, m); lsSet(LINEN_KEY, l);
+      } else {
+        setRecords(lsGet(STORAGE_KEY) ?? []);
+        setApts(lsGet(APT_KEY)    ?? DEFAULT_APTS);
+        setMaids(lsGet(MAIDS_KEY) ?? DEFAULT_MAIDS);
+        setLinen(lsGet(LINEN_KEY) ?? DEFAULT_LINEN);
+        setOnline(false);
+      }
+    })();
+
+    const es = new EventSource("/api/events");
+    es.onmessage = (e) => {
+      try {
+        const { key, value } = JSON.parse(e.data);
+        if (key === "records") { setRecords(value); lsSet(STORAGE_KEY, value); }
+        if (key === "apts")    { setApts(value);    lsSet(APT_KEY, value); }
+        if (key === "maids")   { setMaids(value);   lsSet(MAIDS_KEY, value); }
+        if (key === "linen")   { setLinen(value);   lsSet(LINEN_KEY, value); }
+        showSync();
+      } catch {}
+    };
+    es.onerror = () => setOnline(false);
+    es.onopen  = () => setOnline(true);
 
     function onStorage(e) {
       if (e.key === STORAGE_KEY) { setRecords(e.newValue ? JSON.parse(e.newValue) : []); showSync(); }
@@ -58,7 +112,7 @@ export default function App() {
       if (e.key === LINEN_KEY)   { setLinen(e.newValue  ? JSON.parse(e.newValue) : DEFAULT_LINEN); showSync(); }
     }
     window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    return () => { es.close(); window.removeEventListener("storage", onStorage); };
   }, []);
 
   function showSync() {
@@ -66,10 +120,10 @@ export default function App() {
     setTimeout(() => setSyncBanner(false), 2500);
   }
 
-  function saveRecords(list) { setRecords(list); lsSet(STORAGE_KEY, list); }
-  function saveApts(list)    { setApts(list);    lsSet(APT_KEY, list); }
-  function saveMaids(list)   { setMaids(list);   lsSet(MAIDS_KEY, list); }
-  function saveLinen(list)   { setLinen(list);   lsSet(LINEN_KEY, list); }
+  function saveRecords(list) { setRecords(list); lsSet(STORAGE_KEY, list); apiSync("records", list); }
+  function saveApts(list)    { setApts(list);    lsSet(APT_KEY, list);     apiSync("apts", list); }
+  function saveMaids(list)   { setMaids(list);   lsSet(MAIDS_KEY, list);   apiSync("maids", list); }
+  function saveLinen(list)   { setLinen(list);   lsSet(LINEN_KEY, list);   apiSync("linen", list); }
 
   if (!apts || !maids || !linen) return (
     <div style={{...s.root,display:"flex",alignItems:"center",justifyContent:"center",color:"#555"}}>Загрузка…</div>
@@ -83,7 +137,8 @@ export default function App() {
           <div style={s.headerTitle}>Учёт белья</div>
           <div style={s.headerSub}>Журнал прачечной</div>
         </div>
-        <div style={{...s.syncPill, opacity: syncBanner ? 1 : 0}}>🔄 Синхронізовано</div>
+        {!online && <div style={s.offlinePill}>⚠️ Офлайн</div>}
+        {online  && <div style={{...s.syncPill, opacity: syncBanner ? 1 : 0}}>🔄 Синхронізовано</div>}
       </div>
 
       <div style={s.tabBar}>
@@ -686,6 +741,7 @@ const s = {
   qtyBadge:        { background:"#1e2844", color:"#8ab4f8", borderRadius:8, padding:"2px 10px", fontSize:13, fontWeight:"bold" },
   consumBox:       { background:"#1e1a0e", border:"1px solid #3a2e10", borderRadius:8, padding:"10px 12px", marginTop:10 },
   syncPill:        { fontSize:11, color:"#5cd87a", background:"#1a3020", border:"1px solid #2a5030", borderRadius:20, padding:"4px 10px", transition:"opacity 0.4s", whiteSpace:"nowrap" },
+  offlinePill:     { fontSize:11, color:"#e8b84b", background:"#2a2010", border:"1px solid #5a4010", borderRadius:20, padding:"4px 10px", whiteSpace:"nowrap" },
   discardBtn:      { background:"none", border:"1px solid #3a2f20", borderRadius:8, color:"#c9a84c", fontSize:12, padding:"6px 12px", cursor:"pointer", fontFamily:"inherit" },
   lockBtn:         { background:"none", border:"1px solid #2a2f3e", borderRadius:8, color:"#888", fontSize:12, padding:"6px 12px", cursor:"pointer", fontFamily:"inherit" },
   sectionTabs:     { display:"flex", gap:8, marginBottom:4 },
