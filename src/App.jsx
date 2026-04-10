@@ -228,13 +228,29 @@ function LogTab({ records, saveRecords, apts, maids, linen }) {
     e.target.value = "";
   }
 
-  function handleSave() {
-    if (!form.apartment||!form.maid) return;
-    saveRecords([{...form,id:Date.now()},...records]);
-    setForm({date:today(),apartment:"",maid:"",linen:{},consumables:"",notes:"",photos:[]});
-    setAptSearch(""); setStep(1);
-    setSaved(true); setTimeout(()=>setSaved(false),2500);
-  }
+  const handleSaveRecord = async () => {
+    if (!selectedApartment || !selectedWorker) {
+      alert("Выберите квартиру и сотрудника!");
+      return;
+    }
+
+    const { error } = await supabase
+      .from('laundry_records')
+      .insert([{
+        apartment_number: selectedApartment,
+        worker_name: selectedWorker,
+        items_json: counts 
+      }]);
+
+    if (error) {
+      alert("Ошибка: " + error.message);
+    } else {
+      alert("✅ Запись добавлена в журнал!");
+      setCounts({});
+      setSelectedApartment('');
+    }
+  };
+
 
   return (
     <div style={s.page}>
@@ -319,7 +335,7 @@ function LogTab({ records, saveRecords, apts, maids, linen }) {
           placeholder="Пятно, повреждение, особые замечания…"
           rows={2} style={{...s.input,resize:"none",lineHeight:1.6}}/>
 
-        <button onClick={handleSave} disabled={!form.maid}
+        <button onClick={handleSaveRecord} disabled={!form.maid}
           style={{...s.saveBtn,...(!form.maid?s.saveBtnOff:{})}}>
           💾 Сохранить запись
         </button>
