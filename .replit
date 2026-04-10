@@ -67,5 +67,6 @@ channel = "stable-25_05"
 
 [deployment]
 deploymentTarget = "static"
-run = ["sh", "-c", "node index.js"]
-publicDir = "./"
+run = ["sh", "-c", "npx vite preview --port 80 --host 0.0.0.0"]
+build = ["sh", "-c", "npm run build"]
+publicDir = "dist"
