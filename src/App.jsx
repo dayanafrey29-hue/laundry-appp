@@ -229,7 +229,8 @@ function LogTab({ records, saveRecords, apts, maids, linen }) {
   }
 
   const handleSaveRecord = async () => {
-    if (!selectedApartment || !selectedWorker) {
+    // Перевіряємо, чи вибрана квартира та покоївка у твоєму об'єкті form
+    if (!form.apartment || !form.maid) {
       alert("Выберите квартиру и сотрудника!");
       return;
     }
@@ -237,19 +238,27 @@ function LogTab({ records, saveRecords, apts, maids, linen }) {
     const { error } = await supabase
       .from('laundry_records')
       .insert([{
-        apartment_number: selectedApartment,
-        worker_name: selectedWorker,
-        items_json: counts 
+        apartment_number: form.apartment, // беремо квартиру з форми
+        worker_name: form.maid,           // беремо покоївку з форми
+        items_json: form.counts,          // беремо кількість білизни
+        notes: form.notes || ''            // додаємо нотатки, якщо є
       }]);
 
     if (error) {
       alert("Ошибка: " + error.message);
     } else {
       alert("✅ Запись добавлена в журнал!");
-      setCounts({});
-      setSelectedApartment('');
+      // Очищаємо форму після збереження
+      setForm({
+        ...form,
+        apartment: '',
+        counts: {},
+        notes: '',
+        photos: []
+      });
     }
   };
+
 
 
   return (
