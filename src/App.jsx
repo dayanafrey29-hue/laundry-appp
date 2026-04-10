@@ -335,8 +335,10 @@ function LogTab({ records, saveRecords, apts, maids, linen }) {
           placeholder="Пятно, повреждение, особые замечания…"
           rows={2} style={{...s.input,resize:"none",lineHeight:1.6}}/>
 
-        <button onClick={handleSaveRecord} disabled={!form.maid}
-          style={{...s.saveBtn,...(!form.maid?s.saveBtnOff:{})}}>
+        <button 
+          onClick={handleSaveRecord} 
+          style={s.saveBtn}
+        >
           💾 Сохранить запись
         </button>
       </>}
