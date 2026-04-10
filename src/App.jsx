@@ -43,13 +43,28 @@ export default function App() {
   const [maids, setMaids]     = useState(null);
   const [linen, setLinen]     = useState(null);
   const [settingsUnlocked, setSettingsUnlocked] = useState(false);
+  const [syncBanner, setSyncBanner] = useState(false);
 
   useEffect(() => {
     setRecords(lsGet(STORAGE_KEY) ?? []);
     setApts(lsGet(APT_KEY)    ?? DEFAULT_APTS);
     setMaids(lsGet(MAIDS_KEY) ?? DEFAULT_MAIDS);
     setLinen(lsGet(LINEN_KEY) ?? DEFAULT_LINEN);
+
+    function onStorage(e) {
+      if (e.key === STORAGE_KEY) { setRecords(e.newValue ? JSON.parse(e.newValue) : []); showSync(); }
+      if (e.key === APT_KEY)     { setApts(e.newValue   ? JSON.parse(e.newValue) : DEFAULT_APTS); showSync(); }
+      if (e.key === MAIDS_KEY)   { setMaids(e.newValue  ? JSON.parse(e.newValue) : DEFAULT_MAIDS); showSync(); }
+      if (e.key === LINEN_KEY)   { setLinen(e.newValue  ? JSON.parse(e.newValue) : DEFAULT_LINEN); showSync(); }
+    }
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, []);
+
+  function showSync() {
+    setSyncBanner(true);
+    setTimeout(() => setSyncBanner(false), 2500);
+  }
 
   function saveRecords(list) { setRecords(list); lsSet(STORAGE_KEY, list); }
   function saveApts(list)    { setApts(list);    lsSet(APT_KEY, list); }
@@ -64,10 +79,11 @@ export default function App() {
     <div style={s.root}>
       <div style={s.header}>
         <span style={{fontSize:26}}>🧺</span>
-        <div>
+        <div style={{flex:1}}>
           <div style={s.headerTitle}>Учёт белья</div>
           <div style={s.headerSub}>Журнал прачечной</div>
         </div>
+        <div style={{...s.syncPill, opacity: syncBanner ? 1 : 0}}>🔄 Синхронізовано</div>
       </div>
 
       <div style={s.tabBar}>
@@ -370,11 +386,40 @@ function HistoryTab({ records, saveRecords, linen }) {
 
 // ─── SETTINGS TAB ────────────────────────────────────────────────
 function SettingsTab({ apts, saveApts, maids, saveMaids, linen, saveLinen, onLock }) {
-  const [section, setSection] = useState("apts");
+  const [section,    setSection]    = useState("apts");
+  const [draftApts,  setDraftApts]  = useState(() => apts);
+  const [draftMaids, setDraftMaids] = useState(() => maids);
+  const [draftLinen, setDraftLinen] = useState(() => linen);
+  const [saved,      setSaved]      = useState(false);
+
+  const dirty =
+    JSON.stringify(draftApts)  !== JSON.stringify(apts)  ||
+    JSON.stringify(draftMaids) !== JSON.stringify(maids) ||
+    JSON.stringify(draftLinen) !== JSON.stringify(linen);
+
+  function handleSave() {
+    saveApts(draftApts);
+    saveMaids(draftMaids);
+    saveLinen(draftLinen);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  }
+
+  function handleDiscard() {
+    setDraftApts(apts);
+    setDraftMaids(maids);
+    setDraftLinen(linen);
+  }
 
   return (
     <div style={s.page}>
-      <div style={{display:"flex",justifyContent:"flex-end",marginBottom:16}}>
+      {saved && <div style={s.savedBanner}>✓ Налаштування збережено!</div>}
+
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+        {dirty
+          ? <button onClick={handleDiscard} style={s.discardBtn}>↩ Скасувати</button>
+          : <div/>
+        }
         <button onClick={onLock} style={s.lockBtn}>🔒 Заблокировать</button>
       </div>
 
@@ -387,9 +432,16 @@ function SettingsTab({ apts, saveApts, maids, saveMaids, linen, saveLinen, onLoc
         ))}
       </div>
 
-      {section==="apts"  && <ListEditor items={apts}  saveItems={saveApts}  addPlaceholder="Номер / название…" sortAlpha />}
-      {section==="maids" && <ListEditor items={maids} saveItems={saveMaids} addPlaceholder="Имя горничной…" />}
-      {section==="linen" && <LinenEditor linen={linen} saveLinen={saveLinen}/>}
+      {section==="apts"  && <ListEditor items={draftApts}  saveItems={setDraftApts}  addPlaceholder="Номер / название…" sortAlpha />}
+      {section==="maids" && <ListEditor items={draftMaids} saveItems={setDraftMaids} addPlaceholder="Имя горничной…" />}
+      {section==="linen" && <LinenEditor linen={draftLinen} saveLinen={setDraftLinen}/>}
+
+      <button
+        onClick={handleSave}
+        disabled={!dirty}
+        style={{...s.saveBtn, marginTop:28, ...(!dirty ? s.saveBtnOff : {})}}>
+        💾 Зберегти налаштування
+      </button>
     </div>
   );
 }
@@ -633,6 +685,8 @@ const s = {
   linenRowSmall:   { display:"flex", justifyContent:"space-between", alignItems:"center", fontSize:13, color:"#999", padding:"5px 0", borderBottom:"1px solid #1a1e2a" },
   qtyBadge:        { background:"#1e2844", color:"#8ab4f8", borderRadius:8, padding:"2px 10px", fontSize:13, fontWeight:"bold" },
   consumBox:       { background:"#1e1a0e", border:"1px solid #3a2e10", borderRadius:8, padding:"10px 12px", marginTop:10 },
+  syncPill:        { fontSize:11, color:"#5cd87a", background:"#1a3020", border:"1px solid #2a5030", borderRadius:20, padding:"4px 10px", transition:"opacity 0.4s", whiteSpace:"nowrap" },
+  discardBtn:      { background:"none", border:"1px solid #3a2f20", borderRadius:8, color:"#c9a84c", fontSize:12, padding:"6px 12px", cursor:"pointer", fontFamily:"inherit" },
   lockBtn:         { background:"none", border:"1px solid #2a2f3e", borderRadius:8, color:"#888", fontSize:12, padding:"6px 12px", cursor:"pointer", fontFamily:"inherit" },
   sectionTabs:     { display:"flex", gap:8, marginBottom:4 },
   sectionTab:      { flex:1, padding:"10px 6px", background:"#1c2030", border:"1px solid #2a2f3e", borderRadius:10, color:"#666", fontSize:12, fontFamily:"inherit", cursor:"pointer", transition:"all 0.2s" },
