@@ -137,8 +137,8 @@ export default function App() {
           <div style={s.headerTitle}>Учёт белья</div>
           <div style={s.headerSub}>Журнал прачечной</div>
         </div>
-        {!online && <div style={s.offlinePill}>⚠️ Офлайн</div>}
-        {online  && <div style={{...s.syncPill, opacity: syncBanner ? 1 : 0}}>🔄 Синхронізовано</div>}
+        {!online && <div style={s.offlinePill}>⚠️ Офлайн (нет связи)</div>}
+        {online  && <div style={{...s.syncPill, opacity: syncBanner ? 1 : 0}}>🔄 Синхронизировано</div>}
       </div>
 
       <div style={s.tabBar}>
@@ -468,11 +468,11 @@ function SettingsTab({ apts, saveApts, maids, saveMaids, linen, saveLinen, onLoc
 
   return (
     <div style={s.page}>
-      {saved && <div style={s.savedBanner}>✓ Налаштування збережено!</div>}
+      {saved && <div style={s.savedBanner}>✓ Настройки сохранены!</div>}
 
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
         {dirty
-          ? <button onClick={handleDiscard} style={s.discardBtn}>↩ Скасувати</button>
+          ? <button onClick={handleDiscard} style={s.discardBtn}>↩ Отменить</button>
           : <div/>
         }
         <button onClick={onLock} style={s.lockBtn}>🔒 Заблокировать</button>
@@ -495,7 +495,7 @@ function SettingsTab({ apts, saveApts, maids, saveMaids, linen, saveLinen, onLoc
         onClick={handleSave}
         disabled={!dirty}
         style={{...s.saveBtn, marginTop:28, ...(!dirty ? s.saveBtnOff : {})}}>
-        💾 Зберегти налаштування
+        💾 Сохранить настройки
       </button>
     </div>
   );
