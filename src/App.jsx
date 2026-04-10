@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { supabase } from './supabaseClient'; // ПІДКЛЮЧАЄМО SUPABASE
+import { supabase } from '../supabaseClient'; // ПІДКЛЮЧАЄМО SUPABASE
 
 const SETTINGS_PASSWORD = "2026";
 
