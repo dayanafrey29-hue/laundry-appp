@@ -58,9 +58,14 @@ externalPort = 3001
 localPort = 5002
 externalPort = 3000
 
+[[ports]]
+localPort = 5003
+externalPort = 3002
+
 [nix]
 channel = "stable-25_05"
 
 [deployment]
 deploymentTarget = "static"
-publicDir = "."
+run = ["sh", "-c", "node index.js"]
+publicDir = "./"
