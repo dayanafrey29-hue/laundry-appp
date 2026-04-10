@@ -32,6 +32,26 @@ function fmtDate(d) {
 }
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
 
+function compressImage(file, maxPx = 1400, quality = 0.82) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+        const w = Math.round(img.width  * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 const KEY_MAP = {
   [STORAGE_KEY]: "records",
   [APT_KEY]:     "apts",
@@ -232,12 +252,11 @@ function LogTab({ records, saveRecords, apts, maids, linen }) {
     setForm(f=>({...f,linen:{...f.linen,[id]:num}}));
   }
 
-  function handlePhoto(e) {
-    Array.from(e.target.files).forEach(file=>{
-      const rd=new FileReader();
-      rd.onload=ev=>setForm(f=>({...f,photos:[...f.photos,ev.target.result]}));
-      rd.readAsDataURL(file);
-    });
+  async function handlePhoto(e) {
+    const files = Array.from(e.target.files);
+    const compressed = await Promise.all(files.map(f => compressImage(f)));
+    setForm(f => ({...f, photos: [...f.photos, ...compressed]}));
+    e.target.value = "";
   }
 
   function handleSave() {
@@ -346,6 +365,7 @@ function HistoryTab({ records, saveRecords, linen }) {
   const [dateFilter,setDateFilter] = useState("");
   const [expanded,setExpanded]     = useState(null);
   const [delId,setDelId]           = useState(null);
+  const [lightbox,setLightbox]     = useState(null);
 
   const filtered = records
     .filter(r=>{
@@ -416,10 +436,13 @@ function HistoryTab({ records, saveRecords, linen }) {
                   })}
                 </>}
                 {r.photos?.length>0 && <>
-                  <div style={s.subLabel}>Фото</div>
+                  <div style={s.subLabel}>Фото — нажмите чтобы открыть</div>
                   <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
                     {r.photos.map((src,i)=>(
-                      <img key={i} src={src} alt="" style={{width:80,height:80,objectFit:"cover",borderRadius:8,border:"1px solid #2a2f3e"}}/>
+                      <div key={i} onClick={()=>setLightbox(src)} style={s.photoThumbWrap}>
+                        <img src={src} alt="" style={s.photoThumb}/>
+                        <div style={s.photoThumbHint}>🔍</div>
+                      </div>
                     ))}
                   </div>
                 </>}
@@ -437,6 +460,28 @@ function HistoryTab({ records, saveRecords, linen }) {
         })
       }
       {delId && <Modal text="Удалить эту запись?" onCancel={()=>setDelId(null)} onConfirm={doDelete}/>}
+      {lightbox && <PhotoLightbox src={lightbox} onClose={()=>setLightbox(null)}/>}
+    </div>
+  );
+}
+
+// ─── PHOTO LIGHTBOX ───────────────────────────────────────────────
+function PhotoLightbox({ src, onClose }) {
+  useEffect(() => {
+    function onKey(e) { if (e.key === "Escape") onClose(); }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div onClick={onClose} style={s.lightboxOverlay}>
+      <button onClick={onClose} style={s.lightboxClose}>✕</button>
+      <img
+        src={src}
+        alt=""
+        onClick={e => e.stopPropagation()}
+        style={s.lightboxImg}
+      />
     </div>
   );
 }
@@ -721,6 +766,12 @@ const s = {
   thumbWrap:       { position:"relative", width:72, height:72 },
   thumb:           { width:72, height:72, objectFit:"cover", borderRadius:10, border:"1px solid #2a2f3e" },
   thumbDel:        { position:"absolute", top:-6, right:-6, width:20, height:20, borderRadius:"50%", background:"#c03030", border:"none", color:"#fff", fontSize:11, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" },
+  photoThumbWrap:  { position:"relative", width:90, height:90, cursor:"pointer", borderRadius:10, overflow:"hidden", border:"1px solid #2a2f3e", flexShrink:0 },
+  photoThumb:      { width:90, height:90, objectFit:"cover", display:"block" },
+  photoThumbHint:  { position:"absolute", bottom:0, right:0, width:24, height:24, background:"rgba(0,0,0,0.55)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, borderTopLeftRadius:6 },
+  lightboxOverlay: { position:"fixed", inset:0, background:"rgba(0,0,0,0.93)", zIndex:200, display:"flex", alignItems:"center", justifyContent:"center", padding:16, cursor:"pointer" },
+  lightboxImg:     { maxWidth:"100%", maxHeight:"100%", objectFit:"contain", borderRadius:8, cursor:"default", boxShadow:"0 4px 40px rgba(0,0,0,0.7)" },
+  lightboxClose:   { position:"fixed", top:16, right:16, width:40, height:40, borderRadius:"50%", background:"rgba(255,255,255,0.15)", border:"none", color:"#fff", fontSize:20, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", zIndex:201 },
   addPhotoBtn:     { width:72, height:72, background:"#1c2030", border:"1px dashed #3a3f55", borderRadius:10, color:"#666", fontSize:18, cursor:"pointer", fontFamily:"inherit", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:2 },
   saveBtn:         { width:"100%", marginTop:20, padding:16, background:"linear-gradient(135deg,#c9a84c,#a07830)", border:"none", borderRadius:12, color:"#fff", fontSize:16, fontFamily:"inherit", fontWeight:"bold", cursor:"pointer", letterSpacing:0.5 },
   saveBtnOff:      { background:"#1c2030", color:"#3a3f4e", cursor:"not-allowed" },
