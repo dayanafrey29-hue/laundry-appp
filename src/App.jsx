@@ -21,7 +21,10 @@ const DEFAULT_LINEN = [
 const DEFAULT_APTS  = ["101","102","103","201","202","203"];
 const DEFAULT_MAIDS = ["Анна","Мария","Светлана","Ольга"];
 
-function today() { return new Date().toISOString().split("T")[0]; }
+function today() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
 function fmtDate(d) {
   if (!d) return "";
   const [y,m,dd] = d.split("-");
@@ -229,6 +232,10 @@ function LogTab({ addRecord, apts, maids, linen }) {
   const [form, setForm]           = useState({date:today(),apartment:"",maid:"",linen:{},consumables:"",notes:"",photos:[]});
   const [saved, setSaved]         = useState(false);
   const photoRef                  = useRef();
+
+  useEffect(() => {
+    if (step === 1) setForm(f => ({...f, date: today()}));
+  }, [step]);
 
   const filteredApts = apts.filter(a=>a.toLowerCase().includes(aptSearch.toLowerCase()));
 
