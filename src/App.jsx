@@ -250,6 +250,23 @@ export default function App() {
     }
   }
 
+  async function updateRecord(id, updates) {
+    try {
+      const { data, error } = await supabase
+        .from('laundry_records')
+        .update(updates)
+        .eq('id', id)
+        .select();
+      if (error) throw error;
+      if (data) setRecords(prev => prev.map(r => r.id === id ? data[0] : r));
+      showSync();
+      return { ok: true };
+    } catch (err) {
+      console.error("Update error:", err);
+      return { ok: false };
+    }
+  }
+
   async function deleteRecord(id) {
     const { error } = await supabase
       .from('laundry_records')
@@ -306,7 +323,7 @@ export default function App() {
         <div style={{display: tab==="log" ? undefined : "none"}}>
           <LogTab addRecord={addRecord} apts={apts} maids={maids} linen={linen}/>
         </div>
-        {tab==="history" && <HistoryTab records={records} deleteRecord={deleteRecord} linen={linen} maids={maids}/>}
+        {tab==="history" && <HistoryTab records={records} deleteRecord={deleteRecord} updateRecord={updateRecord} linen={linen} maids={maids} apts={apts}/>}
         {tab==="settings" && (
           settingsUnlocked
             ? <SettingsTab apts={apts} saveApts={saveApts} maids={maids} saveMaids={saveMaids} linen={linen} saveLinen={saveLinen} theme={theme} saveTheme={saveTheme} bgTheme={bgTheme} saveBgTheme={saveBgTheme} bgImage={bgImage} saveBgImage={saveBgImage} onLock={()=>setSettingsUnlocked(false)}/>
@@ -556,13 +573,14 @@ function LogTab({ addRecord, apts, maids, linen }) {
 }
 
 // ─── HISTORY TAB ─────────────────────────────────────────────────
-function HistoryTab({ records, deleteRecord, linen, maids }) {
+function HistoryTab({ records, deleteRecord, updateRecord, linen, maids, apts }) {
   const [search,setSearch]         = useState("");
   const [dateFilter,setDateFilter] = useState("");
   const [maidFilter,setMaidFilter] = useState("");
   const [expanded,setExpanded]     = useState(null);
   const [delId,setDelId]           = useState(null);
   const [lightbox,setLightbox]     = useState(null);
+  const [editRec,setEditRec]       = useState(null);
 
   const filtered = records
     .filter(r=>{
@@ -582,6 +600,17 @@ function HistoryTab({ records, deleteRecord, linen, maids }) {
   }
 
   const linenMap = Object.fromEntries((linen||[]).map(l=>[l.id,l]));
+
+  if (editRec) {
+    return <EditRecordForm record={editRec} linen={linen} maids={maids} apts={apts}
+      onSave={async (updates) => {
+        const res = await updateRecord(editRec.id, updates);
+        if (res.ok) setEditRec(null);
+        return res;
+      }}
+      onCancel={() => setEditRec(null)}
+    />;
+  }
 
   return (
     <div style={s.page}>
@@ -628,7 +657,8 @@ function HistoryTab({ records, deleteRecord, linen, maids }) {
                     {r.photos?.length>0 && <span style={s.photoBadge}>📷 {r.photos.length}</span>}
                   </div>
                 </div>
-                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  {!r._offline && <button onClick={e=>{e.stopPropagation();setEditRec(r);}} style={s.editBtn}>✏️</button>}
                   <button onClick={e=>{e.stopPropagation();setDelId(r.id);}} style={s.delBtn}>✕</button>
                   <span style={{color:"#555",fontSize:13}}>{isOpen?"▲":"▼"}</span>
                 </div>
@@ -655,7 +685,6 @@ function HistoryTab({ records, deleteRecord, linen, maids }) {
                         <div style={s.photoThumbHint}>🔍</div>
                       </div>
                     ))}
-
                   </div>
                 </>}
                 {r.consumables?.trim() && <div style={s.consumBox}>
@@ -673,6 +702,90 @@ function HistoryTab({ records, deleteRecord, linen, maids }) {
       }
       {delId && <Modal text="Удалить эту запись?" onCancel={()=>setDelId(null)} onConfirm={doDelete}/>}
       {lightbox && <PhotoLightbox src={lightbox} onClose={()=>setLightbox(null)}/>}
+    </div>
+  );
+}
+
+function EditRecordForm({ record, linen, maids, apts, onSave, onCancel }) {
+  const [form, setForm] = useState({
+    apartment: record.apartment || "",
+    maid: record.maid || "",
+    date: record.date || today(),
+    linen: record.linen || {},
+    consumables: record.consumables || "",
+    notes: record.notes || "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  function setQty(id, val) {
+    const num = val === "" ? "" : Math.max(0, parseInt(val) || 0);
+    setForm(f => ({ ...f, linen: { ...f.linen, [id]: num } }));
+  }
+
+  async function handleSave() {
+    if (!form.apartment || !form.maid) { alert("Выберите квартиру и сотрудника!"); return; }
+    setSaving(true);
+    const res = await onSave({
+      apartment: form.apartment,
+      maid: form.maid,
+      date: form.date,
+      linen: form.linen,
+      consumables: form.consumables,
+      notes: form.notes,
+    });
+    setSaving(false);
+    if (res.ok) {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } else {
+      alert("Ошибка сохранения");
+    }
+  }
+
+  return (
+    <div style={s.page}>
+      <button onClick={onCancel} style={{...s.backBtn, marginBottom:16, fontSize:14}}>← Назад</button>
+      {saved && <div style={s.savedBanner}>✓ Изменения сохранены!</div>}
+
+      <div style={s.sL}>🏠 Квартира</div>
+      <select value={form.apartment} onChange={e => setForm(f => ({...f, apartment: e.target.value}))} style={{...s.input, marginBottom:14, color: form.apartment ? "#1C1C1E" : "#8E8E93"}}>
+        <option value="">Выберите…</option>
+        {(apts||[]).map(a => <option key={a} value={a}>{a}</option>)}
+      </select>
+
+      <div style={s.sL}>👤 Сотрудник</div>
+      <select value={form.maid} onChange={e => setForm(f => ({...f, maid: e.target.value}))} style={{...s.input, marginBottom:14, color: form.maid ? "#1C1C1E" : "#8E8E93"}}>
+        <option value="">Выберите…</option>
+        {(maids||[]).map(m => <option key={m} value={m}>{m}</option>)}
+      </select>
+
+      <div style={s.sL}>📅 Дата</div>
+      <input type="date" value={form.date} onChange={e => setForm(f => ({...f, date: e.target.value}))} style={{...s.input, marginBottom:14}}/>
+
+      <div style={s.sL}>🛏 Бельё</div>
+      <div style={{...s.linenTable, marginBottom:14}}>
+        {(linen||[]).map((item, i) => (
+          <div key={item.id} style={{...s.linenRow, background: i % 2 === 0 ? "var(--bg2)" : "var(--bg)"}}>
+            <span style={s.linenLabel}>{item.icon} {item.label}</span>
+            <div style={s.linenQty}>
+              <button onClick={() => setQty(item.id, (parseInt(form.linen[item.id]) || 0) - 1)} style={s.qtyBtn}>−</button>
+              <input value={form.linen[item.id] ?? ""} onChange={e => setQty(item.id, e.target.value)} style={s.qtyInput} inputMode="numeric"/>
+              <button onClick={() => setQty(item.id, (parseInt(form.linen[item.id]) || 0) + 1)} style={s.qtyBtn}>+</button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={s.sL}>🔔 Нужно заказать</div>
+      <textarea value={form.consumables} onChange={e => setForm(f => ({...f, consumables: e.target.value}))} rows={2} placeholder="Шампунь, полотенца…" style={{...s.input, resize:"vertical", marginBottom:14}}/>
+
+      <div style={s.sL}>📝 Примечание</div>
+      <textarea value={form.notes} onChange={e => setForm(f => ({...f, notes: e.target.value}))} rows={2} placeholder="Примечание…" style={{...s.input, resize:"vertical", marginBottom:14}}/>
+
+      <button onClick={handleSave} disabled={saving} style={{...s.saveBtn, ...(saving ? s.saveBtnOff : {})}}>
+        {saving ? "Сохраняю…" : "💾 Сохранить изменения"}
+      </button>
     </div>
   );
 }
@@ -1058,6 +1171,7 @@ const s = {
   cntBadge:        { background:"var(--accent-dim)", color:"var(--accent-dark)", borderRadius:10, padding:"2px 8px", fontSize:11, fontWeight:500 },
   consumBadge:     { background:"#FFF3CD", color:"#B8860B", borderRadius:10, padding:"2px 7px", fontSize:11, fontWeight:500 },
   photoBadge:      { background:"#E8F9ED", color:"#34C759", borderRadius:10, padding:"2px 8px", fontSize:11, fontWeight:500 },
+  editBtn:         { background:"none", border:"none", cursor:"pointer", fontSize:14, padding:0 },
   delBtn:          { background:"none", border:"none", color:"#C7C7CC", cursor:"pointer", fontSize:15, padding:0 },
   cardBody:        { padding:"12px 14px 14px", borderTop:"1px solid rgba(0,0,0,0.04)" },
   subLabel:        { fontSize:11, color:"#8E8E93", textTransform:"uppercase", letterSpacing:0.8, marginBottom:6, marginTop:12, fontWeight:600 },
