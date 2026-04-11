@@ -745,16 +745,15 @@ function doPrint(html) {
   if (!el) {
     el = document.createElement('div');
     el.id = 'tca-print-zone';
-    el.className = 'print-sheet';
     document.body.appendChild(el);
   }
   el.innerHTML = html;
-  el.style.display = 'block';
+  document.body.classList.add('printing');
   setTimeout(() => {
     window.print();
-    el.style.display = 'none';
+    document.body.classList.remove('printing');
     el.innerHTML = '';
-  }, 200);
+  }, 100);
 }
 
 function TaskTab({ apts, linen, syncKey }) {
