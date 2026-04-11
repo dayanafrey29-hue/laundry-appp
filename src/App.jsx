@@ -229,11 +229,17 @@ export default function App() {
         .from('laundry_records')
         .insert([record])
         .select();
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase insert error:", error.message, error.details, error.hint);
+        throw error;
+      }
       if (data) setRecords(prev => [data[0], ...prev]);
       showSync();
+      setOnline(true);
       return { ok: true };
     } catch (err) {
+      console.error("addRecord failed, saving offline:", err);
+      setOnline(false);
       const offlineId = `offline_${uid()}`;
       const pending = getPending();
       pending.push({ ...record, _offlineId: offlineId, _offlinePhotos: offlinePhotos || [] });
