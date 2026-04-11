@@ -311,46 +311,59 @@ function LogTab({ addRecord, apts, maids, linen }) {
       alert("Выберите квартиру и сотрудника!");
       return;
     }
-      try {
-        // 1. Завантажуємо фото у Storage та отримуємо посилання
-        const uploadedUrls = [];
 
-        for (const file of form.photos) {
-          const fileName = `${uid()}.jpg`;
-          const { data, error: uploadError } = await supabase.storage
-            .from('laundry') // Твоя папка, яку ти створила
-            .upload(fileName, file);
+    try {
+      // 1. Завантаження фото
+      const uploadedUrls = [];
+      for (const file of form.photos) {
+        const fileName = `${uid()}.jpg`;
+        const { data, error: uploadError } = await supabase.storage
+          .from('laundry')
+          .upload(fileName, file);
 
-          if (!uploadError) {
-            const { data: urlData } = supabase.storage
-              .from('laundry')
-              .getPublicUrl(fileName);
-            uploadedUrls.push(urlData.publicUrl);
-          } else {
-            console.error("Помилка завантаження:", uploadError);
-          }
+        if (!uploadError) {
+          const { data: urlData } = supabase.storage
+            .from('laundry')
+            .getPublicUrl(fileName);
+          uploadedUrls.push(urlData.publicUrl);
         }
+      }
 
-        // 2. Тепер додаємо запис у таблицю з посиланнями
-        await addRecord({
-          apartment: form.apartment,
-          maid: form.maid,
-          date: form.date,
-          linen: form.linen,
-          consumables: form.consumables,
-          notes: form.notes,
-          photos: uploadedUrls // Вставляємо масив посилань!
-        });
+      // 2. Збереження запису
+      await addRecord({
+        apartment: form.apartment,
+        maid: form.maid,
+        date: form.date,
+        linen: form.linen,
+        consumables: form.consumables,
+        notes: form.notes,
+        photos: uploadedUrls
+      });
 
+      // 3. Успішне завершення
       setSaved(true);
-      setTimeout(() => setSaved(false), 2500);
-      setForm({ date: today(), apartment: "", maid: "", linen: {}, consumables: "", notes: "", photos: [] });
+      setTimeout(() => {
+        setSaved(false);
+      }, 2500);
+
+      // Очищення форми
+      setForm({ 
+        date: today(), 
+        apartment: "", 
+        maid: "", 
+        linen: {}, 
+        consumables: "", 
+        notes: "", 
+        photos: [] 
+      });
       setAptSearch("");
-      setStep(1);
-    } catch (err) {
-      alert("Ошибка сохранения: " + err.message);
+
+    } catch (error) {
+      console.error("Помилка:", error);
+      alert("Виникла помилка при збереженні!");
     }
   };
+
 
 
 
