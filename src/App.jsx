@@ -553,7 +553,7 @@ function LogTab({ addRecord, apts, maids, linen }) {
 
         <div style={s.sL}>🔔 Расходники (что заказать)</div>
         <textarea value={form.consumables} onChange={e=>setForm(f=>({...f,consumables:e.target.value}))}
-          placeholder="Мыло, шампунь, тапочки, туалетная бумага…"
+          placeholder="Туалетная бумага, кофе, чай, утенок, Rituals..."
           rows={3} style={{...s.input,resize:"none",lineHeight:1.6}}/>
 
         <div style={s.sL}>Примечание</div>
@@ -778,7 +778,7 @@ function EditRecordForm({ record, linen, maids, apts, onSave, onCancel }) {
       </div>
 
       <div style={s.sL}>🔔 Нужно заказать</div>
-      <textarea value={form.consumables} onChange={e => setForm(f => ({...f, consumables: e.target.value}))} rows={2} placeholder="Шампунь, полотенца…" style={{...s.input, resize:"vertical", marginBottom:14}}/>
+      <textarea value={form.consumables} onChange={e => setForm(f => ({...f, consumables: e.target.value}))} rows={2} placeholder="Туалетная бумага, кофе, чай, утенок, Rituals..." style={{...s.input, resize:"vertical", marginBottom:14}}/>
 
       <div style={s.sL}>📝 Примечание</div>
       <textarea value={form.notes} onChange={e => setForm(f => ({...f, notes: e.target.value}))} rows={2} placeholder="Примечание…" style={{...s.input, resize:"vertical", marginBottom:14}}/>
