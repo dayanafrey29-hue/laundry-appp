@@ -23,10 +23,10 @@ const DEFAULT_MAIDS = ["Анна","Мария","Светлана","Ольга"];
 
 const THEMES = [
   { id:"blue",    label:"Лаванда",    accent:"#7B8CDE", dark:"#5A6ABF", dim:"#E8EBFA" },
-  { id:"rose",    label:"Рожевий",    accent:"#D4849A", dark:"#B86B82", dim:"#F5E0E6" },
-  { id:"green",   label:"М'ята",      accent:"#6BBF8A", dark:"#4EA06E", dim:"#DFF5E7" },
+  { id:"rose",    label:"Розовый",    accent:"#D4849A", dark:"#B86B82", dim:"#F5E0E6" },
+  { id:"green",   label:"Мята",       accent:"#6BBF8A", dark:"#4EA06E", dim:"#DFF5E7" },
   { id:"peach",   label:"Персик",     accent:"#E0976E", dark:"#C47A50", dim:"#FAE8DA" },
-  { id:"purple",  label:"Фіалка",     accent:"#A78BDB", dark:"#8568BF", dim:"#EDE5FA" },
+  { id:"purple",  label:"Фиалка",     accent:"#A78BDB", dark:"#8568BF", dim:"#EDE5FA" },
 ];
 
 function applyTheme(id) {
@@ -40,11 +40,11 @@ function applyTheme(id) {
 applyTheme("blue");
 
 const BG_THEMES = [
-  { id:"snow",    label:"Сніг",     bg:"#F2F2F7", bg2:"#FFFFFF", bg3:"#E5E5EA" },
+  { id:"snow",    label:"Снег",     bg:"#F2F2F7", bg2:"#FFFFFF", bg3:"#E5E5EA" },
   { id:"cream",   label:"Крем",     bg:"#FAF6F0", bg2:"#FFFFFF", bg3:"#F0EBE2" },
   { id:"sky",     label:"Небо",     bg:"#EDF2FA", bg2:"#FFFFFF", bg3:"#DDE6F2" },
-  { id:"mint",    label:"М'ята",    bg:"#EDF7F0", bg2:"#FFFFFF", bg3:"#DBF0E2" },
-  { id:"blush",   label:"Рум'яна",  bg:"#FAF0F2", bg2:"#FFFFFF", bg3:"#F2DEE3" },
+  { id:"mint",    label:"Мята",     bg:"#EDF7F0", bg2:"#FFFFFF", bg3:"#DBF0E2" },
+  { id:"blush",   label:"Румянец",  bg:"#FAF0F2", bg2:"#FFFFFF", bg3:"#F2DEE3" },
 ];
 
 function applyBg(id) {
@@ -189,40 +189,50 @@ export default function App() {
   function saveBgTheme(id)  { setBgTheme(id); applyBg(id);   syncKey("bg",    id); }
 
   if (!apts || !maids || !linen) return (
-    <div style={{...s.root,display:"flex",alignItems:"center",justifyContent:"center",color:"#555"}}>Загрузка…</div>
+    <div style={s.shell}><div style={{...s.root,display:"flex",alignItems:"center",justifyContent:"center",color:"#8E8E93"}}>Загрузка…</div></div>
   );
 
   return (
-    <div style={s.root}>
-      <div style={s.header}>
-        <span style={{fontSize:26}}>🧺</span>
-        <div style={{flex:1}}>
-          <div style={s.headerTitle}>TCA</div>
-          <div style={s.headerSub}>Журнал прачечной</div>
+    <div style={s.shell}>
+      <style>{`
+        @media(min-width:600px){
+          .tca-root{max-width:540px!important;border-radius:18px!important;margin-top:24px!important;margin-bottom:24px!important;box-shadow:0 4px 30px rgba(0,0,0,0.08)!important;overflow:hidden!important}
+        }
+        @media(min-width:900px){
+          .tca-root{max-width:620px!important}
+        }
+      `}</style>
+      <div style={s.root} className="tca-root">
+        <div style={s.header}>
+          <span style={{fontSize:26}}>🧺</span>
+          <div style={{flex:1}}>
+            <div style={s.headerTitle}>TCA</div>
+            <div style={s.headerSub}>Журнал прачечной</div>
+          </div>
+          {!online && <div style={s.offlinePill}>⚠️ Офлайн (проблема с БД)</div>}
+          {online  && <div style={{...s.syncPill, opacity: syncBanner ? 1 : 0}}>🔄 Данные сохранены</div>}
         </div>
-        {!online && <div style={s.offlinePill}>⚠️ Офлайн (проблема с БД)</div>}
-        {online  && <div style={{...s.syncPill, opacity: syncBanner ? 1 : 0}}>🔄 Данные сохранены</div>}
-      </div>
 
-      <div style={s.tabBar}>
-        {[["log","📝","Записать"],["history","🔍","История"],["settings","⚙️","Настройки"]].map(([key,icon,label])=>(
-          <button key={key} onClick={()=>setTab(key)}
-            style={{...s.tab,...(tab===key?s.tabActive:{})}}>
-            <span style={{fontSize:18}}>{icon}</span>
-            <span style={{fontSize:11}}>{label}</span>
-          </button>
-        ))}
-      </div>
+        <div style={s.tabBar}>
+          {[["log","📝","Записать"],["history","🔍","История"],["settings","⚙️","Настройки"]].map(([key,icon,label])=>(
+            <button key={key} onClick={()=>setTab(key)}
+              style={{...s.tab,...(tab===key?s.tabActive:{})}}>
+              <span style={{fontSize:18}}>{icon}</span>
+              <span style={{fontSize:11}}>{label}</span>
+            </button>
+          ))}
+        </div>
 
-      <div style={{display: tab==="log" ? undefined : "none"}}>
-        <LogTab addRecord={addRecord} apts={apts} maids={maids} linen={linen}/>
+        <div style={{display: tab==="log" ? undefined : "none"}}>
+          <LogTab addRecord={addRecord} apts={apts} maids={maids} linen={linen}/>
+        </div>
+        {tab==="history" && <HistoryTab records={records} deleteRecord={deleteRecord} linen={linen}/>}
+        {tab==="settings" && (
+          settingsUnlocked
+            ? <SettingsTab apts={apts} saveApts={saveApts} maids={maids} saveMaids={saveMaids} linen={linen} saveLinen={saveLinen} theme={theme} saveTheme={saveTheme} bgTheme={bgTheme} saveBgTheme={saveBgTheme} onLock={()=>setSettingsUnlocked(false)}/>
+            : <PasswordGate onUnlock={()=>setSettingsUnlocked(true)}/>
+        )}
       </div>
-      {tab==="history" && <HistoryTab records={records} deleteRecord={deleteRecord} linen={linen}/>}
-      {tab==="settings" && (
-        settingsUnlocked
-          ? <SettingsTab apts={apts} saveApts={saveApts} maids={maids} saveMaids={saveMaids} linen={linen} saveLinen={saveLinen} theme={theme} saveTheme={saveTheme} bgTheme={bgTheme} saveBgTheme={saveBgTheme} onLock={()=>setSettingsUnlocked(false)}/>
-          : <PasswordGate onUnlock={()=>setSettingsUnlocked(true)}/>
-      )}
     </div>
   );
 }
@@ -868,7 +878,8 @@ function Modal({ text, onCancel, onConfirm }) {
 // ─── STYLES ──────────────────────────────────────────────────────
 const brd = "1px solid rgba(0,0,0,0.06)";
 const s = {
-  root:            { minHeight:"100vh", background:"var(--bg)", color:"#1C1C1E", fontFamily:"'Inter','SF Pro Display',-apple-system,BlinkMacSystemFont,sans-serif", maxWidth:480, margin:"0 auto", paddingBottom:70 },
+  shell:           { minHeight:"100vh", background:"var(--bg3)", display:"flex", justifyContent:"center" },
+  root:            { minHeight:"100vh", background:"var(--bg)", color:"#1C1C1E", fontFamily:"'Inter','SF Pro Display',-apple-system,BlinkMacSystemFont,sans-serif", width:"100%", maxWidth:480, paddingBottom:70 },
   header:          { display:"flex", alignItems:"center", gap:12, padding:"18px 20px 14px", background:"var(--bg2)", borderBottom:brd, position:"sticky", top:0, zIndex:10, backdropFilter:"blur(12px)", WebkitBackdropFilter:"blur(12px)" },
   headerTitle:     { fontSize:22, fontWeight:700, letterSpacing:-0.3, color:"#1C1C1E" },
   headerSub:       { fontSize:11, color:"#8E8E93", letterSpacing:0.6, textTransform:"uppercase", fontWeight:500 },
