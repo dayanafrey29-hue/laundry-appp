@@ -407,7 +407,11 @@ function LogTab({ addRecord, apts, maids, linen }) {
 
   function setQty(id, val) {
     const num = val===""?"" : Math.max(0,parseInt(val)||0);
-    setForm(f=>({...f,linen:{...f.linen,[id]:num}}));
+    setForm(f=>{
+      const newLinen = {...f.linen, [id]:num};
+      delete newLinen._no_linen;
+      return {...f, linen: newLinen};
+    });
   }
 
   async function handlePhoto(e) {
@@ -535,6 +539,23 @@ function LogTab({ addRecord, apts, maids, linen }) {
               </div>
             ))}
           </div>
+          <button
+            onClick={() => {
+              const cleared = {};
+              linen.forEach(item => { cleared[item.id] = 0; });
+              setForm(f => ({...f, linen: {...cleared, _no_linen: true}}));
+            }}
+            style={{
+              width:"100%", marginTop:8, padding:"10px 0",
+              background: form.linen._no_linen ? "#FFF0F0" : "var(--bg2)",
+              border: form.linen._no_linen ? "1.5px solid #FF3B30" : brd,
+              borderRadius:12, cursor:"pointer", fontFamily:"inherit",
+              fontSize:13, fontWeight:600,
+              color: form.linen._no_linen ? "#FF3B30" : "#8E8E93",
+              transition:"all 0.15s"
+            }}>
+            {form.linen._no_linen ? "⚠️ Нет белья!" : "⚠️ Нет белья"}
+          </button>
         </>}
 
         <div style={s.sL}>Фото (необязательно)</div>
@@ -647,7 +668,8 @@ function HistoryTab({ records, deleteRecord, updateRecord, linen, maids, apts })
                   <div style={s.cardApt}>🏠 {r.apartment} {r._offline && <span style={s.pendingPill}>ожидает синхр.</span>}</div>
                   <div style={s.cardMeta}>
                     👤 {r.maid} · 📅 {fmtDate(r.date)}
-                    {total>0 && <span style={s.cntBadge}>{total} ед.</span>}
+                    {r.linen?._no_linen && <span style={s.noLinenBadge}>⚠️ Нет белья</span>}
+                    {!r.linen?._no_linen && total>0 && <span style={s.cntBadge}>{total} ед.</span>}
                     {r.consumables?.trim() && <span style={s.consumBadge}>🔔</span>}
                     {r.photos?.length>0 && <span style={s.photoBadge}>📷 {r.photos.length}</span>}
                   </div>
@@ -659,7 +681,8 @@ function HistoryTab({ records, deleteRecord, updateRecord, linen, maids, apts })
                 </div>
               </div>
               {isOpen && <div style={s.cardBody}>
-                {linenEntries.length>0 && <>
+                {r.linen?._no_linen && <div style={{background:"#FFF0F0",border:"1px solid #FFD4D4",borderRadius:12,padding:"10px 14px",textAlign:"center",fontSize:14,fontWeight:600,color:"#FF3B30",marginBottom:8}}>⚠️ Нет белья</div>}
+                {!r.linen?._no_linen && linenEntries.length>0 && <>
                   <div style={s.subLabel}>Бельё</div>
                   {linenEntries.map(([id,qty])=>{
                     const item = linenMap[id];
@@ -1160,6 +1183,7 @@ const s = {
   cntBadge:        { background:"var(--accent-dim)", color:"var(--accent-dark)", borderRadius:10, padding:"2px 8px", fontSize:11, fontWeight:500 },
   consumBadge:     { background:"#FFF3CD", color:"#B8860B", borderRadius:10, padding:"2px 7px", fontSize:11, fontWeight:500 },
   photoBadge:      { background:"#E8F9ED", color:"#34C759", borderRadius:10, padding:"2px 8px", fontSize:11, fontWeight:500 },
+  noLinenBadge:    { background:"#FFF0F0", color:"#FF3B30", borderRadius:10, padding:"2px 8px", fontSize:11, fontWeight:600 },
   editBtn:         { background:"none", border:"none", cursor:"pointer", fontSize:14, padding:0 },
   delBtn:          { background:"none", border:"none", color:"#C7C7CC", cursor:"pointer", fontSize:15, padding:0 },
   cardBody:        { padding:"12px 14px 14px", borderTop:"1px solid rgba(0,0,0,0.04)" },
