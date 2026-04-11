@@ -259,7 +259,7 @@ export default function App() {
   }
 
   function saveApts(list)   { const sorted = [...list].sort((a,b)=>a.localeCompare(b,"ru",{numeric:true})); setApts(sorted); syncKey("apts", sorted); }
-  function saveMaids(list)  { setMaids(list); syncKey("maids", list); }
+  function saveMaids(list)  { const sorted = [...list].sort((a,b)=>a.localeCompare(b,"ru")); setMaids(sorted); syncKey("maids", sorted); }
   function saveLinen(list)  { setLinen(list); syncKey("linen", list); }
   function saveTheme(id)    { setTheme(id);   applyTheme(id); syncKey("theme", id); }
   function saveBgTheme(id)  { setBgTheme(id); applyBg(id);   syncKey("bg",    id); }
