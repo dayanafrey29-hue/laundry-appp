@@ -556,11 +556,6 @@ function LogTab({ addRecord, apts, maids, linen }) {
           placeholder="Туалетная бумага, кофе, чай, утенок, Rituals..."
           rows={3} style={{...s.input,resize:"none",lineHeight:1.6}}/>
 
-        <div style={s.sL}>Примечание</div>
-        <textarea value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))}
-          placeholder="Пятно, повреждение, особые замечания…"
-          rows={2} style={{...s.input,resize:"none",lineHeight:1.6}}/>
-
         <button
           onClick={handleSaveRecord}
           disabled={saving}
@@ -691,10 +686,6 @@ function HistoryTab({ records, deleteRecord, updateRecord, linen, maids, apts })
                   <div style={s.subLabel}>🔔 Нужно заказать</div>
                   <p style={{margin:0,fontSize:13,color:"#e8b84b",lineHeight:1.6}}>{r.consumables}</p>
                 </div>}
-                {r.notes?.trim() && <>
-                  <div style={s.subLabel}>Примечание</div>
-                  <p style={{margin:0,fontSize:13,color:"#888",fontStyle:"italic",lineHeight:1.5}}>{r.notes}</p>
-                </>}
               </div>}
             </div>
           );
@@ -780,8 +771,6 @@ function EditRecordForm({ record, linen, maids, apts, onSave, onCancel }) {
       <div style={s.sL}>🔔 Нужно заказать</div>
       <textarea value={form.consumables} onChange={e => setForm(f => ({...f, consumables: e.target.value}))} rows={2} placeholder="Туалетная бумага, кофе, чай, утенок, Rituals..." style={{...s.input, resize:"vertical", marginBottom:14}}/>
 
-      <div style={s.sL}>📝 Примечание</div>
-      <textarea value={form.notes} onChange={e => setForm(f => ({...f, notes: e.target.value}))} rows={2} placeholder="Примечание…" style={{...s.input, resize:"vertical", marginBottom:14}}/>
 
       <button onClick={handleSave} disabled={saving} style={{...s.saveBtn, ...(saving ? s.saveBtnOff : {})}}>
         {saving ? "Сохраняю…" : "💾 Сохранить изменения"}
