@@ -362,7 +362,7 @@ function LogTab({ addRecord, apts, maids, linen }) {
       console.error("Помилка:", error);
       alert("Виникла помилка при збереженні!");
     }
-  };
+    };
 
 
 
