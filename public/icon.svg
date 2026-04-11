@@ -6,6 +6,15 @@
     </linearGradient>
   </defs>
   <rect width="512" height="512" rx="92" fill="url(#g)"/>
-  <text x="256" y="230" text-anchor="middle" dominant-baseline="middle" font-family="sans-serif" font-weight="700" font-size="140" fill="#fff">TCA</text>
-  <text x="256" y="360" text-anchor="middle" dominant-baseline="middle" font-size="90">🧺</text>
+  <g transform="translate(256,195)" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+    <ellipse cx="0" cy="0" rx="72" ry="28" fill="rgba(255,255,255,0.15)" stroke="#fff"/>
+    <path d="M-72,0 C-68,70 -40,105 0,105 C40,105 68,70 72,0" fill="rgba(255,255,255,0.1)" stroke="#fff"/>
+    <line x1="-36" y1="8" x2="-28" y2="95"/>
+    <line x1="0" y1="12" x2="0" y2="105"/>
+    <line x1="36" y1="8" x2="28" y2="95"/>
+    <path d="M-30,-22 C-30,-55 30,-55 30,-22" stroke="#fff" fill="none" stroke-width="7"/>
+    <circle cx="-8" cy="-18" r="12" fill="rgba(255,255,255,0.25)" stroke="#fff" stroke-width="5"/>
+    <circle cx="22" cy="-10" r="8" fill="rgba(255,255,255,0.2)" stroke="#fff" stroke-width="5"/>
+  </g>
+  <text x="256" y="400" text-anchor="middle" dominant-baseline="middle" font-family="sans-serif" font-weight="700" font-size="100" fill="#fff" letter-spacing="-2">TCA</text>
 </svg>
