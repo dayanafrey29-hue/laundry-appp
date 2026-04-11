@@ -691,6 +691,7 @@ function PhotoLightbox({ src, onClose }) {
 // ─── SETTINGS TAB ────────────────────────────────────────────────
 function SettingsTab({ apts, saveApts, maids, saveMaids, linen, saveLinen, theme, saveTheme, bgTheme, saveBgTheme, onLock }) {
   const [section,    setSection]    = useState("apts");
+  const [showThemes, setShowThemes] = useState(false);
   const [draftApts,  setDraftApts]  = useState(() => apts);
   const [draftMaids, setDraftMaids] = useState(() => maids);
   const [draftLinen, setDraftLinen] = useState(() => linen);
@@ -715,6 +716,52 @@ function SettingsTab({ apts, saveApts, maids, saveMaids, linen, saveLinen, theme
     setDraftLinen(linen);
   }
 
+  if (showThemes) {
+    const currentTheme = THEMES.find(t => t.id === theme) || THEMES[0];
+    const currentBg = BG_THEMES.find(t => t.id === bgTheme) || BG_THEMES[0];
+    return (
+      <div style={s.page}>
+        <button onClick={() => setShowThemes(false)} style={{...s.backBtn, marginBottom:16, fontSize:14}}>
+          ← Назад
+        </button>
+
+        <div style={s.sL}>🎨 Цвет акцента</div>
+        <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:20}}>
+          {THEMES.map(t=>(
+            <button key={t.id} onClick={()=>saveTheme(t.id)} style={{
+              display:"flex", flexDirection:"column", alignItems:"center", gap:6,
+              background: theme===t.id ? t.dim : "var(--bg2)",
+              border: `2px solid ${theme===t.id ? t.accent : "rgba(0,0,0,0.06)"}`,
+              borderRadius:14, padding:"12px 14px", cursor:"pointer", fontFamily:"inherit",
+              transition:"all 0.2s", minWidth:60,
+              boxShadow: theme===t.id ? `0 2px 8px ${t.accent}30` : "0 1px 3px rgba(0,0,0,0.04)",
+            }}>
+              <div style={{width:28,height:28,borderRadius:"50%",background:`linear-gradient(135deg,${t.accent},${t.dark})`}}/>
+              <span style={{fontSize:11,color: theme===t.id ? t.dark : "#8E8E93", fontWeight: theme===t.id ? 600 : 400}}>{t.label}</span>
+            </button>
+          ))}
+        </div>
+
+        <div style={s.sL}>🌤 Цвет фона</div>
+        <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:20}}>
+          {BG_THEMES.map(t=>(
+            <button key={t.id} onClick={()=>saveBgTheme(t.id)} style={{
+              display:"flex", flexDirection:"column", alignItems:"center", gap:6,
+              background: bgTheme===t.id ? "var(--accent-dim)" : "var(--bg2)",
+              border: `2px solid ${bgTheme===t.id ? "var(--accent)" : "rgba(0,0,0,0.06)"}`,
+              borderRadius:14, padding:"12px 14px", cursor:"pointer", fontFamily:"inherit",
+              transition:"all 0.2s", minWidth:60,
+              boxShadow: bgTheme===t.id ? "0 2px 8px rgba(0,0,0,0.08)" : "0 1px 3px rgba(0,0,0,0.04)",
+            }}>
+              <div style={{width:28,height:28,borderRadius:"50%",background:t.bg,border:"1px solid rgba(0,0,0,0.08)"}}/>
+              <span style={{fontSize:11,color: bgTheme===t.id ? "var(--accent-dark)" : "#8E8E93", fontWeight: bgTheme===t.id ? 600 : 400}}>{t.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={s.page}>
       {saved && <div style={s.savedBanner}>✓ Настройки сохранены!</div>}
@@ -727,39 +774,16 @@ function SettingsTab({ apts, saveApts, maids, saveMaids, linen, saveLinen, theme
         <button onClick={onLock} style={s.lockBtn}>🔒 Заблокировать</button>
       </div>
 
-      <div style={s.sL}>🎨 Цветная тема (кнопки)</div>
-      <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:4}}>
-        {THEMES.map(t=>(
-          <button key={t.id} onClick={()=>saveTheme(t.id)} style={{
-            display:"flex", flexDirection:"column", alignItems:"center", gap:5,
-            background: theme===t.id ? t.dim : "transparent",
-            border: `2px solid ${theme===t.id ? t.accent : "rgba(0,0,0,0.08)"}`,
-            borderRadius:12, padding:"10px 12px", cursor:"pointer", fontFamily:"inherit",
-            transition:"all 0.2s",
-          }}>
-            <div style={{width:22,height:22,borderRadius:"50%",background:`linear-gradient(135deg,${t.accent},${t.dark})`}}/>
-            <span style={{fontSize:10,color: theme===t.id ? t.dark : "#8E8E93", fontWeight:theme===t.id ? 600 : 400}}>{t.label}</span>
-          </button>
-        ))}
-      </div>
+      <button onClick={() => setShowThemes(true)} style={s.themeMenuBtn}>
+        <span style={{fontSize:18}}>🎨</span>
+        <div style={{flex:1,textAlign:"left"}}>
+          <div style={{fontSize:14,fontWeight:600,color:"#1C1C1E"}}>Оформление</div>
+          <div style={{fontSize:12,color:"#8E8E93"}}>{(THEMES.find(t=>t.id===theme)||THEMES[0]).label} · {(BG_THEMES.find(t=>t.id===bgTheme)||BG_THEMES[0]).label}</div>
+        </div>
+        <span style={{color:"#C7C7CC",fontSize:16}}>›</span>
+      </button>
 
-      <div style={s.sL}>🌑 Цвет фона</div>
-      <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:18}}>
-        {BG_THEMES.map(t=>(
-          <button key={t.id} onClick={()=>saveBgTheme(t.id)} style={{
-            display:"flex", flexDirection:"column", alignItems:"center", gap:5,
-            background: bgTheme===t.id ? "var(--accent-dim)" : "transparent",
-            border: `2px solid ${bgTheme===t.id ? "var(--accent)" : "rgba(0,0,0,0.08)"}`,
-            borderRadius:12, padding:"10px 12px", cursor:"pointer", fontFamily:"inherit",
-            transition:"all 0.2s",
-          }}>
-            <div style={{width:22,height:22,borderRadius:"50%",background:t.bg,border:"1px solid rgba(0,0,0,0.08)"}}/>
-            <span style={{fontSize:10,color: bgTheme===t.id ? "var(--accent-dark)" : "#8E8E93", fontWeight:bgTheme===t.id ? 600 : 400}}>{t.label}</span>
-          </button>
-        ))}
-      </div>
-
-      <div style={s.sectionTabs}>
+      <div style={{...s.sectionTabs, marginTop:18}}>
         {[["apts","🏠 Квартиры"],["maids","👤 Горничные"],["linen","🧺 Бельё"]].map(([key,label])=>(
           <button key={key} onClick={()=>setSection(key)}
             style={{...s.sectionTab,...(section===key?s.sectionTabActive:{})}}>
@@ -1032,6 +1056,7 @@ const s = {
   syncPill:        { fontSize:11, color:"#34C759", background:"#E8F9ED", border:"none", borderRadius:20, padding:"4px 10px", transition:"opacity 0.4s", whiteSpace:"nowrap", fontWeight:500 },
   offlinePill:     { fontSize:11, color:"#FF9500", background:"#FFF3CD", border:"none", borderRadius:20, padding:"4px 10px", whiteSpace:"nowrap", fontWeight:500 },
   pendingPill:     { fontSize:11, color:"#5856D6", background:"#EDEDFA", border:"none", borderRadius:20, padding:"4px 10px", whiteSpace:"nowrap", fontWeight:500 },
+  themeMenuBtn:    { display:"flex", alignItems:"center", gap:12, width:"100%", padding:"14px 16px", background:"var(--bg2)", border:brd, borderRadius:14, cursor:"pointer", fontFamily:"inherit", boxShadow:"0 1px 3px rgba(0,0,0,0.04)", transition:"all 0.15s" },
   discardBtn:      { background:"none", border:"1px solid var(--accent-dim)", borderRadius:10, color:"var(--accent)", fontSize:12, padding:"6px 12px", cursor:"pointer", fontFamily:"inherit", fontWeight:500 },
   lockBtn:         { background:"none", border:brd, borderRadius:10, color:"#8E8E93", fontSize:12, padding:"6px 12px", cursor:"pointer", fontFamily:"inherit", fontWeight:500 },
   sectionTabs:     { display:"flex", gap:8, marginBottom:4 },
