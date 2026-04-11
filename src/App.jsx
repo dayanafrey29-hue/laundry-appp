@@ -21,6 +21,24 @@ const DEFAULT_LINEN = [
 const DEFAULT_APTS  = ["101","102","103","201","202","203"];
 const DEFAULT_MAIDS = ["Анна","Мария","Светлана","Ольга"];
 
+const THEMES = [
+  { id:"gold",    label:"Золотий",    accent:"#c9a84c", dark:"#a07830", dim:"#3a2f20" },
+  { id:"blue",    label:"Синій",      accent:"#5b9bd5", dark:"#3a72aa", dim:"#1a2a3a" },
+  { id:"green",   label:"Зелений",    accent:"#5cb87a", dark:"#3a9060", dim:"#1a3020" },
+  { id:"purple",  label:"Фіолет",     accent:"#9c7fd4", dark:"#7458b0", dim:"#2a1a40" },
+  { id:"rose",    label:"Рожевий",    accent:"#d4709c", dark:"#b04878", dim:"#3a1a28" },
+];
+
+function applyTheme(id) {
+  const t = THEMES.find(x => x.id === id) || THEMES[0];
+  const r = document.documentElement.style;
+  r.setProperty("--accent",      t.accent);
+  r.setProperty("--accent-dark", t.dark);
+  r.setProperty("--accent-dim",  t.dim);
+  r.setProperty("--accent-grad", `linear-gradient(135deg,${t.accent},${t.dark})`);
+}
+applyTheme("gold");
+
 function today() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
@@ -62,6 +80,7 @@ export default function App() {
   const [settingsUnlocked, setSettingsUnlocked] = useState(false);
   const [syncBanner, setSyncBanner] = useState(false);
   const [online, setOnline]   = useState(true);
+  const [theme, setTheme]     = useState("gold");
 
   // ЗАВАНТАЖЕННЯ ЗАПИСІВ З SUPABASE
   useEffect(() => {
@@ -83,15 +102,16 @@ export default function App() {
         const map = (!error && data)
           ? Object.fromEntries(data.map(r => [r.key, r.value]))
           : {};
-        const a = map['apts']  || DEFAULT_APTS;
-        const m = map['maids'] || DEFAULT_MAIDS;
-        const l = map['linen'] || DEFAULT_LINEN;
-        setApts(a);
-        setMaids(m);
-        setLinen(l);
+        const a  = map['apts']  || DEFAULT_APTS;
+        const m  = map['maids'] || DEFAULT_MAIDS;
+        const l  = map['linen'] || DEFAULT_LINEN;
+        const th = map['theme'] || 'gold';
+        setApts(a); setMaids(m); setLinen(l);
+        setTheme(th); applyTheme(th);
         if (!map['apts'])  syncKey('apts',  a);
         if (!map['maids']) syncKey('maids', m);
         if (!map['linen']) syncKey('linen', l);
+        if (!map['theme']) syncKey('theme', th);
       });
   }, []);
 
@@ -131,9 +151,10 @@ export default function App() {
     if (!error) setRecords(prev => prev.filter(r => r.id !== id));
   }
 
-  function saveApts(list)  { const sorted = [...list].sort((a,b)=>a.localeCompare(b,"ru",{numeric:true})); setApts(sorted); syncKey("apts", sorted); }
-  function saveMaids(list) { setMaids(list); syncKey("maids", list); }
-  function saveLinen(list) { setLinen(list); syncKey("linen", list); }
+  function saveApts(list)   { const sorted = [...list].sort((a,b)=>a.localeCompare(b,"ru",{numeric:true})); setApts(sorted); syncKey("apts", sorted); }
+  function saveMaids(list)  { setMaids(list); syncKey("maids", list); }
+  function saveLinen(list)  { setLinen(list); syncKey("linen", list); }
+  function saveTheme(id)    { setTheme(id); applyTheme(id); syncKey("theme", id); }
 
   if (!apts || !maids || !linen) return (
     <div style={{...s.root,display:"flex",alignItems:"center",justifyContent:"center",color:"#555"}}>Загрузка…</div>
@@ -161,11 +182,13 @@ export default function App() {
         ))}
       </div>
 
-      {tab==="log"     && <LogTab addRecord={addRecord} apts={apts} maids={maids} linen={linen}/>}
+      <div style={{display: tab==="log" ? undefined : "none"}}>
+        <LogTab addRecord={addRecord} apts={apts} maids={maids} linen={linen}/>
+      </div>
       {tab==="history" && <HistoryTab records={records} deleteRecord={deleteRecord} linen={linen}/>}
       {tab==="settings" && (
         settingsUnlocked
-          ? <SettingsTab apts={apts} saveApts={saveApts} maids={maids} saveMaids={saveMaids} linen={linen} saveLinen={saveLinen} onLock={()=>setSettingsUnlocked(false)}/>
+          ? <SettingsTab apts={apts} saveApts={saveApts} maids={maids} saveMaids={saveMaids} linen={linen} saveLinen={saveLinen} theme={theme} saveTheme={saveTheme} onLock={()=>setSettingsUnlocked(false)}/>
           : <PasswordGate onUnlock={()=>setSettingsUnlocked(true)}/>
       )}
     </div>
@@ -502,7 +525,7 @@ function PhotoLightbox({ src, onClose }) {
 }
 
 // ─── SETTINGS TAB ────────────────────────────────────────────────
-function SettingsTab({ apts, saveApts, maids, saveMaids, linen, saveLinen, onLock }) {
+function SettingsTab({ apts, saveApts, maids, saveMaids, linen, saveLinen, theme, saveTheme, onLock }) {
   const [section,    setSection]    = useState("apts");
   const [draftApts,  setDraftApts]  = useState(() => apts);
   const [draftMaids, setDraftMaids] = useState(() => maids);
@@ -538,6 +561,22 @@ function SettingsTab({ apts, saveApts, maids, saveMaids, linen, saveLinen, onLoc
           : <div/>
         }
         <button onClick={onLock} style={s.lockBtn}>🔒 Заблокировать</button>
+      </div>
+
+      <div style={s.sL}>🎨 Кольорова тема</div>
+      <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:18}}>
+        {THEMES.map(t=>(
+          <button key={t.id} onClick={()=>saveTheme(t.id)} style={{
+            display:"flex", flexDirection:"column", alignItems:"center", gap:5,
+            background: theme===t.id ? "#1e2030" : "transparent",
+            border: `2px solid ${theme===t.id ? t.accent : "#2a2f3e"}`,
+            borderRadius:12, padding:"10px 12px", cursor:"pointer", fontFamily:"inherit",
+            transition:"border 0.2s",
+          }}>
+            <div style={{width:22,height:22,borderRadius:"50%",background:`linear-gradient(135deg,${t.accent},${t.dark})`}}/>
+            <span style={{fontSize:10,color: theme===t.id ? t.accent : "#666"}}>{t.label}</span>
+          </button>
+        ))}
       </div>
 
       <div style={s.sectionTabs}>
@@ -761,7 +800,7 @@ const s = {
   headerSub:       { fontSize:11, color:"#666", letterSpacing:1, textTransform:"uppercase" },
   tabBar:          { display:"flex", borderBottom:"1px solid #252a38", position:"sticky", top:64, zIndex:9, background:"#111318" },
   tab:             { flex:1, padding:"10px 0", background:"transparent", border:"none", borderBottom:"2px solid transparent", color:"#666", fontSize:13, fontFamily:"inherit", cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", gap:2, transition:"all 0.2s" },
-  tabActive:       { background:"#161a24", borderBottom:"2px solid #c9a84c", color:"#c9a84c", fontWeight:"bold" },
+  tabActive:       { background:"#161a24", borderBottom:"2px solid var(--accent)", color:"var(--accent)", fontWeight:"bold" },
   page:            { padding:"20px 16px" },
   sL:              { fontSize:10, color:"#666", textTransform:"uppercase", letterSpacing:1.4, marginBottom:8, marginTop:18 },
   input:           { width:"100%", padding:"11px 13px", background:"#1c2030", border:"1px solid #2a2f3e", borderRadius:10, color:"#ddd8cc", fontSize:14, fontFamily:"inherit", boxSizing:"border-box", outline:"none", WebkitAppearance:"none" },
@@ -770,7 +809,7 @@ const s = {
   aptBtn:          { padding:"12px 4px", background:"#1c2030", border:"1px solid #2a2f3e", borderRadius:10, color:"#ddd8cc", fontSize:14, fontFamily:"inherit", cursor:"pointer" },
   aptHeader:       { display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:4 },
   aptBadge:        { background:"#1e2844", border:"1px solid #2e3a5e", borderRadius:20, padding:"6px 14px", fontSize:14, color:"#8ab4f8", fontWeight:"bold" },
-  backBtn:         { background:"none", border:"none", color:"#c9a84c", fontSize:13, cursor:"pointer", fontFamily:"inherit", padding:0 },
+  backBtn:         { background:"none", border:"none", color:"var(--accent)", fontSize:13, cursor:"pointer", fontFamily:"inherit", padding:0 },
   row2:            { display:"flex", gap:12 },
   linenTable:      { borderRadius:12, border:"1px solid #252a38", overflow:"hidden" },
   linenRow:        { display:"flex", alignItems:"center", padding:"10px 14px", borderBottom:"1px solid #1a1e2a", gap:10 },
@@ -788,11 +827,11 @@ const s = {
   lightboxImg:     { maxWidth:"100%", maxHeight:"100%", objectFit:"contain", borderRadius:8, cursor:"default", boxShadow:"0 4px 40px rgba(0,0,0,0.7)" },
   lightboxClose:   { position:"fixed", top:16, right:16, width:40, height:40, borderRadius:"50%", background:"rgba(255,255,255,0.15)", border:"none", color:"#fff", fontSize:20, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", zIndex:201 },
   addPhotoBtn:     { width:72, height:72, background:"#1c2030", border:"1px dashed #3a3f55", borderRadius:10, color:"#666", fontSize:18, cursor:"pointer", fontFamily:"inherit", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:2 },
-  saveBtn:         { width:"100%", marginTop:20, padding:16, background:"linear-gradient(135deg,#c9a84c,#a07830)", border:"none", borderRadius:12, color:"#fff", fontSize:16, fontFamily:"inherit", fontWeight:"bold", cursor:"pointer", letterSpacing:0.5 },
+  saveBtn:         { width:"100%", marginTop:20, padding:16, background:"var(--accent-grad)", border:"none", borderRadius:12, color:"#fff", fontSize:16, fontFamily:"inherit", fontWeight:"bold", cursor:"pointer", letterSpacing:0.5 },
   saveBtnOff:      { background:"#1c2030", color:"#3a3f4e", cursor:"not-allowed" },
   savedBanner:     { background:"#1a3020", border:"1px solid #2a5030", color:"#5cd87a", borderRadius:10, padding:"12px 16px", textAlign:"center", fontSize:14, marginBottom:16, fontWeight:"bold" },
   emptyHint:       { background:"#1c2030", border:"1px dashed #3a3f55", borderRadius:10, padding:"16px", textAlign:"center", fontSize:13, color:"#666" },
-  clearBtn:        { background:"none", border:"none", color:"#c9a84c", fontSize:12, cursor:"pointer", padding:"6px 0", fontFamily:"inherit" },
+  clearBtn:        { background:"none", border:"none", color:"var(--accent)", fontSize:12, cursor:"pointer", padding:"6px 0", fontFamily:"inherit" },
   countLabel:      { fontSize:12, color:"#555", margin:"10px 0 12px" },
   empty:           { textAlign:"center", padding:"60px 0" },
   card:            { background:"#161a24", borderRadius:12, border:"1px solid #252a38", marginBottom:10, overflow:"hidden" },
@@ -810,20 +849,20 @@ const s = {
   consumBox:       { background:"#1e1a0e", border:"1px solid #3a2e10", borderRadius:8, padding:"10px 12px", marginTop:10 },
   syncPill:        { fontSize:11, color:"#5cd87a", background:"#1a3020", border:"1px solid #2a5030", borderRadius:20, padding:"4px 10px", transition:"opacity 0.4s", whiteSpace:"nowrap" },
   offlinePill:     { fontSize:11, color:"#e8b84b", background:"#2a2010", border:"1px solid #5a4010", borderRadius:20, padding:"4px 10px", whiteSpace:"nowrap" },
-  discardBtn:      { background:"none", border:"1px solid #3a2f20", borderRadius:8, color:"#c9a84c", fontSize:12, padding:"6px 12px", cursor:"pointer", fontFamily:"inherit" },
+  discardBtn:      { background:"none", border:"1px solid var(--accent-dim)", borderRadius:8, color:"var(--accent)", fontSize:12, padding:"6px 12px", cursor:"pointer", fontFamily:"inherit" },
   lockBtn:         { background:"none", border:"1px solid #2a2f3e", borderRadius:8, color:"#888", fontSize:12, padding:"6px 12px", cursor:"pointer", fontFamily:"inherit" },
   sectionTabs:     { display:"flex", gap:8, marginBottom:4 },
   sectionTab:      { flex:1, padding:"10px 6px", background:"#1c2030", border:"1px solid #2a2f3e", borderRadius:10, color:"#666", fontSize:12, fontFamily:"inherit", cursor:"pointer", transition:"all 0.2s" },
   sectionTabActive:{ background:"#222840", border:"1px solid #3a4a6e", color:"#8ab4f8", fontWeight:"bold" },
-  importBtn:       { background:"#1c2030", border:"1px solid #3a3f55", borderRadius:8, color:"#c9a84c", fontSize:12, padding:"6px 12px", cursor:"pointer", fontFamily:"inherit" },
+  importBtn:       { background:"#1c2030", border:"1px solid #3a3f55", borderRadius:8, color:"var(--accent)", fontSize:12, padding:"6px 12px", cursor:"pointer", fontFamily:"inherit" },
   importBox:       { background:"#111318", border:"1px solid #252a38", borderRadius:10, padding:14, marginBottom:14 },
-  addBtn:          { padding:"11px 14px", background:"linear-gradient(135deg,#c9a84c,#a07830)", border:"none", borderRadius:10, color:"#fff", fontSize:13, fontFamily:"inherit", fontWeight:"bold", cursor:"pointer", whiteSpace:"nowrap" },
+  addBtn:          { padding:"11px 14px", background:"var(--accent-grad)", border:"none", borderRadius:10, color:"#fff", fontSize:13, fontFamily:"inherit", fontWeight:"bold", cursor:"pointer", whiteSpace:"nowrap" },
   listBox:         { background:"#111318", borderRadius:10, border:"1px solid #1e2330", overflow:"hidden", maxHeight:320, overflowY:"auto" },
   listRow:         { display:"flex", alignItems:"center", padding:"11px 14px", borderBottom:"1px solid #1a1e2a" },
   listLabel:       { flex:1, fontSize:14 },
   rowDelBtn:       { background:"none", border:"none", color:"#555", fontSize:14, cursor:"pointer", padding:"0 4px" },
   cancelSmall:     { flex:1, padding:"9px 0", background:"#1c2030", border:"1px solid #2a2f3e", borderRadius:8, color:"#888", cursor:"pointer", fontFamily:"inherit", fontSize:13 },
-  confirmSmall:    { flex:1, padding:"9px 0", background:"linear-gradient(135deg,#c9a84c,#a07830)", border:"none", borderRadius:8, color:"#fff", cursor:"pointer", fontFamily:"inherit", fontSize:13, fontWeight:"bold" },
+  confirmSmall:    { flex:1, padding:"9px 0", background:"var(--accent-grad)", border:"none", borderRadius:8, color:"#fff", cursor:"pointer", fontFamily:"inherit", fontSize:13, fontWeight:"bold" },
   linenAddBox:     { background:"#1c2030", border:"1px solid #2a2f3e", borderRadius:12, padding:14, marginBottom:14 },
   linenEditRow:    { display:"flex", alignItems:"center", padding:"9px 12px", borderBottom:"1px solid #1a1e2a" },
   arrowBtn:        { background:"none", border:"none", color:"#555", fontSize:11, cursor:"pointer", padding:"1px 3px", lineHeight:1, display:"block" },
@@ -832,7 +871,7 @@ const s = {
   iconPickerBtn:   { display:"flex", alignItems:"center", gap:8, background:"#1c2030", border:"1px solid #3a3f55", borderRadius:8, padding:"8px 14px", cursor:"pointer", fontFamily:"inherit" },
   iconGrid:        { display:"flex", flexWrap:"wrap", gap:6, background:"#111318", border:"1px solid #252a38", borderRadius:10, padding:10, marginTop:6 },
   iconBtn:         { width:36, height:36, background:"#1c2030", border:"1px solid #2a2f3e", borderRadius:8, fontSize:18, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" },
-  iconBtnActive:   { background:"#2a2516", border:"1px solid #c9a84c" },
+  iconBtnActive:   { background:"#2a2516", border:"1px solid var(--accent)" },
   modal:           { position:"fixed", inset:0, background:"rgba(0,0,0,0.75)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:100, padding:24 },
   modalBox:        { background:"#1c2030", borderRadius:16, padding:24, border:"1px solid #2a2f3e", width:"100%", maxWidth:300 },
   modalCancel:     { flex:1, padding:12, borderRadius:10, background:"#111318", border:"1px solid #2a2f3e", color:"#888", cursor:"pointer", fontFamily:"inherit", fontSize:14 },
