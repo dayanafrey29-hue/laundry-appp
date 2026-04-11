@@ -78,9 +78,11 @@ function compressImage(file, maxPx = 1200, quality = 0.6) {
         const h = Math.round(img.height * scale);
         const canvas = document.createElement("canvas");
         canvas.width = w; canvas.height = h;
-        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL("image/jpeg", quality));
-      };
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      canvas.toBlob((blob) => {
+        resolve(blob); // Повертає файл (Blob)
+      }, "image/jpeg", 0.6);
+
       img.src = e.target.result;
     };
     reader.readAsDataURL(file);
@@ -293,26 +295,53 @@ function LogTab({ addRecord, apts, maids, linen }) {
 
   async function handlePhoto(e) {
     const files = Array.from(e.target.files);
-    const compressed = await Promise.all(files.map(f => compressImage(f)));
-    setForm(f => ({...f, photos: [...f.photos, ...compressed]}));
+    // Тепер ми просто стискаємо до стану файлу (Blob), а не тексту
+    const compressedFiles = await Promise.all(files.map(f => compressImage(f)));
+
+    setForm(f => ({
+      ...f,
+      photos: [...f.photos, ...compressedFiles] // Тут тепер лежатимуть справжні файли
+    }));
     e.target.value = "";
   }
+
 
   const handleSaveRecord = async () => {
     if (!form.apartment || !form.maid) {
       alert("Выберите квартиру и сотрудника!");
       return;
     }
-    try {
-      await addRecord({
-        apartment:   form.apartment,
-        maid:        form.maid,
-        date:        form.date,
-        linen:       form.linen,
-        consumables: form.consumables,
-        notes:       form.notes,
-        photos:      form.photos,
-      });
+      try {
+        // 1. Завантажуємо фото у Storage та отримуємо посилання
+        const uploadedUrls = [];
+
+        for (const file of form.photos) {
+          const fileName = `${uid()}.jpg`;
+          const { data, error: uploadError } = await supabase.storage
+            .from('laundry') // Твоя папка, яку ти створила
+            .upload(fileName, file);
+
+          if (!uploadError) {
+            const { data: urlData } = supabase.storage
+              .from('laundry')
+              .getPublicUrl(fileName);
+            uploadedUrls.push(urlData.publicUrl);
+          } else {
+            console.error("Помилка завантаження:", uploadError);
+          }
+        }
+
+        // 2. Тепер додаємо запис у таблицю з посиланнями
+        await addRecord({
+          apartment: form.apartment,
+          maid: form.maid,
+          date: form.date,
+          linen: form.linen,
+          consumables: form.consumables,
+          notes: form.notes,
+          photos: uploadedUrls // Вставляємо масив посилань!
+        });
+
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
       setForm({ date: today(), apartment: "", maid: "", linen: {}, consumables: "", notes: "", photos: [] });
