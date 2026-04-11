@@ -1046,7 +1046,7 @@ const brd = "1px solid rgba(0,0,0,0.06)";
 const s = {
   shell:           { minHeight:"100vh", background:"var(--bg3)", display:"flex", justifyContent:"center", position:"relative" },
   root:            { minHeight:"100vh", background:"var(--bg)", color:"#1C1C1E", fontFamily:"'Inter','SF Pro Display',-apple-system,BlinkMacSystemFont,sans-serif", width:"100%", maxWidth:480, paddingBottom:70, position:"relative", zIndex:1 },
-  header:          { display:"flex", alignItems:"center", gap:12, padding:"18px 20px 14px", background:"var(--bg2)", borderBottom:brd, position:"sticky", top:0, zIndex:10, backdropFilter:"blur(12px)", WebkitBackdropFilter:"blur(12px)" },
+  header:          { display:"flex", alignItems:"center", gap:12, padding:"18px 20px 14px", background:"var(--bg)", borderBottom:brd, position:"sticky", top:0, zIndex:10, backdropFilter:"blur(12px)", WebkitBackdropFilter:"blur(12px)" },
   headerTitle:     { fontSize:22, fontWeight:700, letterSpacing:-0.3, color:"#1C1C1E" },
   headerSub:       { fontSize:11, color:"#8E8E93", letterSpacing:0.6, textTransform:"uppercase", fontWeight:500 },
   tabBar:          { display:"flex", borderBottom:brd, position:"sticky", top:56, zIndex:9, background:"var(--bg)", padding:"0 16px" },
