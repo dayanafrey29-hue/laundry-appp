@@ -364,10 +364,6 @@ function LogTab({ addRecord, apts, maids, linen }) {
     }
   };
 
-
-
-
-
   return (
     <div style={s.page}>
       {saved && <div style={s.savedBanner}>✓ Запись сохранена!</div>}
