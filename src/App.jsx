@@ -740,20 +740,49 @@ function HistoryTab({ records, deleteRecord, updateRecord, linen, maids, apts })
 }
 
 // ─── TASK TAB (SUPERVISOR) ────────────────────────────────────────
-function doPrint(html) {
-  let el = document.getElementById('tca-print-zone');
-  if (!el) {
-    el = document.createElement('div');
-    el.id = 'tca-print-zone';
-    document.body.appendChild(el);
+function buildOrderText(date, itemsList, linen) {
+  let text = `Задание на ${fmtDate(date)}\n\n`;
+  for (const { apt, linen: ln, consumables } of itemsList) {
+    const items = Object.entries(ln).filter(([, v]) => parseInt(v) > 0);
+    const consParts = consumables?.trim() ? consumables.trim().split(/[,;]+/).map(c => c.trim()).filter(Boolean) : [];
+    if (items.length === 0 && consParts.length === 0) continue;
+    text += `${apt}:\n`;
+    for (const [id, qty] of items) {
+      const item = linen.find(l => l.id === id);
+      text += `  - ${item ? item.label : id} ${qty}\n`;
+    }
+    for (const c of consParts) {
+      text += `  - ${c}\n`;
+    }
+    text += `\n`;
   }
-  el.innerHTML = html;
-  document.body.classList.add('printing');
-  setTimeout(() => {
-    window.print();
-    document.body.classList.remove('printing');
-    el.innerHTML = '';
-  }, 100);
+  return text.trim();
+}
+
+function CopyTextBlock({ text }) {
+  const [copied, setCopied] = useState(false);
+  function handleCopy() {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+  return (
+    <div style={{ marginTop:12 }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
+        <div style={{ fontSize:11, color:"#8E8E93", fontWeight:600, letterSpacing:0.5 }}>ГОТОВЫЙ СПИСОК</div>
+        <button onClick={handleCopy} style={{
+          background: copied ? "#34C759" : "var(--accent)", color:"#fff", border:"none",
+          borderRadius:8, padding:"5px 14px", fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:"inherit", transition:"all 0.2s"
+        }}>{copied ? "✓ Скопировано" : "📋 Копировать"}</button>
+      </div>
+      <pre style={{
+        background:"#fff", border:brd, borderRadius:12, padding:14, fontSize:12,
+        whiteSpace:"pre-wrap", wordBreak:"break-word", lineHeight:1.6, color:"#1C1C1E",
+        fontFamily:"'Inter',sans-serif", margin:0, userSelect:"all", WebkitUserSelect:"all"
+      }}>{text}</pre>
+    </div>
+  );
 }
 
 function TaskTab({ apts, linen, syncKey }) {
@@ -818,34 +847,10 @@ function TaskTab({ apts, linen, syncKey }) {
     if (historyDetail?.id === id) setHistoryDetail(null);
   }
 
-  function buildPrintHtml(date, itemsList) {
-    let html = `<div style="text-align:center;margin-bottom:12px;border-bottom:2px solid #000;padding-bottom:6px"><div style="font-size:14px;font-weight:700">Задание на ${fmtDate(date)}</div></div>`;
-    for (const { apt, linen: ln, consumables } of itemsList) {
-      const items = Object.entries(ln).filter(([, v]) => parseInt(v) > 0);
-      const consParts = consumables?.trim() ? consumables.trim().split(/[,;]+/).map(c => c.trim()).filter(Boolean) : [];
-      if (items.length === 0 && consParts.length === 0) continue;
-      html += `<div style="margin-bottom:10px"><div style="font-size:13px;font-weight:700">${apt}:</div>`;
-      for (const [id, qty] of items) {
-        const item = linen.find(l => l.id === id);
-        html += `<div style="font-size:12px;padding-left:12px">— ${item ? item.label : id} ${qty}</div>`;
-      }
-      for (const c of consParts) {
-        html += `<div style="font-size:12px;padding-left:12px">— ${c}</div>`;
-      }
-      html += `</div>`;
-    }
-    return html;
-  }
-
   function handleSave() {
     saveToHistory();
     setOrders([]);
     setOrderDate(today());
-  }
-
-  function handlePrint() {
-    saveToHistory();
-    doPrint(buildPrintHtml(orderDate, orders));
   }
 
   function loadFromHistory(entry) {
@@ -855,35 +860,19 @@ function TaskTab({ apts, linen, syncKey }) {
     setShowHistory(false);
   }
 
-  function reprintFromHistory(entry) {
-    doPrint(buildPrintHtml(entry.date, entry.items));
-  }
-
   if (historyDetail) {
     const e = historyDetail;
+    const text = buildOrderText(e.date, e.items, linen);
     return (
       <div style={s.page}>
         <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}>
           <button onClick={() => setHistoryDetail(null)} style={{ background:"none", border:"none", fontSize:20, cursor:"pointer", color:"var(--accent)", padding:0 }}>←</button>
           <div style={{ fontSize:16, fontWeight:700 }}>📋 {fmtDate(e.date)}</div>
         </div>
-        {e.items.map(({ apt, linen: ln, consumables }) => {
-          const items = Object.entries(ln).filter(([, v]) => parseInt(v) > 0);
-          return (
-            <div key={apt} style={{ ...s.card, marginBottom:8, padding:"10px 14px" }}>
-              <div style={{ fontWeight:600, fontSize:14, marginBottom:4 }}>🏠 {apt}</div>
-              {items.map(([id, qty]) => {
-                const item = linen.find(l => l.id === id);
-                return <div key={id} style={{ fontSize:12, color:"#555", paddingLeft:8 }}>— {item ? `${item.icon} ${item.label}` : id} {qty}</div>;
-              })}
-              {consumables?.trim() && <div style={{ fontSize:11, color:"#B8860B", marginTop:4, paddingLeft:8 }}>🔔 {consumables}</div>}
-            </div>
-          );
-        })}
-        <div style={{ display:"flex", gap:8, marginTop:12 }}>
+        <CopyTextBlock text={text}/>
+        <div style={{ display:"flex", gap:8, marginTop:16 }}>
           <button onClick={() => loadFromHistory(e)} style={{ ...s.saveBtn, flex:1, marginTop:0, background:"var(--accent-dark)" }}>✏️ Изменить</button>
-          <button onClick={() => reprintFromHistory(e)} style={{ ...s.saveBtn, flex:1, marginTop:0 }}>🖨️ Печать</button>
-          <button onClick={() => { deleteHistoryEntry(e.id); }} style={{ ...s.saveBtn, flex:1, marginTop:0, background:"#FF3B30" }}>🗑</button>
+          <button onClick={() => { deleteHistoryEntry(e.id); }} style={{ ...s.saveBtn, flex:1, marginTop:0, background:"#FF3B30" }}>🗑 Удалить</button>
         </div>
       </div>
     );
@@ -954,6 +943,8 @@ function TaskTab({ apts, linen, syncKey }) {
     );
   }
 
+  const orderText = orders.length > 0 ? buildOrderText(orderDate, orders, linen) : "";
+
   return (
     <div style={s.page}>
       <div style={s.sL}>Дата заказа</div>
@@ -1000,14 +991,11 @@ function TaskTab({ apts, linen, syncKey }) {
           );
         })}
 
-        <div style={{ display:"flex", gap:8, marginTop:16 }}>
-          <button onClick={handleSave} style={{ ...s.saveBtn, flex:1, marginTop:0, background:"var(--accent-dark)" }}>
-            💾 Сохранить
-          </button>
-          <button onClick={handlePrint} style={{ ...s.saveBtn, flex:1, marginTop:0 }} className="no-print">
-            🖨️ Печать
-          </button>
-        </div>
+        <CopyTextBlock text={orderText}/>
+
+        <button onClick={handleSave} style={{ ...s.saveBtn, marginTop:16 }}>
+          💾 Сохранить заказ
+        </button>
       </>}
 
       {orders.length === 0 && !aptSearch && (
