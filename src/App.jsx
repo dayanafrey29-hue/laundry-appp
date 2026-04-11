@@ -102,18 +102,77 @@ export default function App() {
   const [linen, setLinen]     = useState(null);
   const [settingsUnlocked, setSettingsUnlocked] = useState(false);
   const [syncBanner, setSyncBanner] = useState(false);
-  const [online, setOnline]   = useState(true);
-  const [theme, setTheme]     = useState("gold");
-  const [bgTheme, setBgTheme] = useState("dark");
+  const [online, setOnline]   = useState(navigator.onLine);
+  const [theme, setTheme]     = useState("blue");
+  const [bgTheme, setBgTheme] = useState("snow");
+  const [pendingCount, setPendingCount] = useState(0);
 
-  // ЗАВАНТАЖЕННЯ ЗАПИСІВ З SUPABASE
+  function getPending() {
+    try { return JSON.parse(localStorage.getItem("tca_pending") || "[]"); }
+    catch { return []; }
+  }
+  function savePending(list) {
+    localStorage.setItem("tca_pending", JSON.stringify(list));
+    setPendingCount(list.length);
+  }
+
+  async function flushPending() {
+    const pending = getPending();
+    if (!pending.length) return;
+    const still = [];
+    for (const rec of pending) {
+      try {
+        const uploadedUrls = [];
+        if (rec._offlinePhotos && rec._offlinePhotos.length) {
+          for (const dataUrl of rec._offlinePhotos) {
+            const resp = await fetch(dataUrl);
+            const blob = await resp.blob();
+            const fileName = `${Date.now()}_${uid()}.jpg`;
+            const { data, error: upErr } = await supabase.storage
+              .from('laundry').upload(fileName, blob, { contentType: 'image/jpeg' });
+            if (!upErr && data) {
+              const { data: urlData } = supabase.storage.from('laundry').getPublicUrl(data.path);
+              uploadedUrls.push(urlData.publicUrl);
+            }
+          }
+        }
+        const { _offlinePhotos, _offlineId, ...clean } = rec;
+        clean.photos = uploadedUrls;
+        const { data, error } = await supabase.from('laundry_records').insert([clean]).select();
+        if (error) throw error;
+        if (data) setRecords(prev => [data[0], ...prev.filter(r => r.id !== _offlineId)]);
+      } catch {
+        still.push(rec);
+      }
+    }
+    savePending(still);
+    if (still.length < pending.length) showSync();
+  }
+
+  useEffect(() => {
+    setPendingCount(getPending().length);
+    const goOnline = () => { setOnline(true); flushPending(); };
+    const goOffline = () => setOnline(false);
+    window.addEventListener('online', goOnline);
+    window.addEventListener('offline', goOffline);
+    return () => { window.removeEventListener('online', goOnline); window.removeEventListener('offline', goOffline); };
+  }, []);
+
   useEffect(() => {
     supabase
       .from('laundry_records')
       .select('*')
       .order('created_at', { ascending: false })
       .then(({ data, error }) => {
-        if (!error && data) setRecords(data);
+        if (!error && data) {
+          setRecords(prev => {
+            const pending = getPending();
+            const offlineIds = pending.map(p => p._offlineId);
+            const offlineRecords = prev.filter(r => offlineIds.includes(r.id));
+            return [...offlineRecords, ...data];
+          });
+          flushPending();
+        }
       });
   }, []);
 
@@ -164,14 +223,24 @@ export default function App() {
     }
   }
 
-  async function addRecord(record) {
-    const { data, error } = await supabase
-      .from('laundry_records')
-      .insert([record])
-      .select();
-    if (error) throw error;
-    if (data) setRecords(prev => [data[0], ...prev]);
-    showSync();
+  async function addRecord(record, offlinePhotos) {
+    try {
+      const { data, error } = await supabase
+        .from('laundry_records')
+        .insert([record])
+        .select();
+      if (error) throw error;
+      if (data) setRecords(prev => [data[0], ...prev]);
+      showSync();
+      return { ok: true };
+    } catch (err) {
+      const offlineId = `offline_${uid()}`;
+      const pending = getPending();
+      pending.push({ ...record, _offlineId: offlineId, _offlinePhotos: offlinePhotos || [] });
+      savePending(pending);
+      setRecords(prev => [{ ...record, id: offlineId, created_at: new Date().toISOString(), _offline: true }, ...prev]);
+      return { ok: false, offline: true };
+    }
   }
 
   async function deleteRecord(id) {
@@ -209,8 +278,9 @@ export default function App() {
             <div style={s.headerTitle}>TCA</div>
             <div style={s.headerSub}>Журнал прачечной</div>
           </div>
-          {!online && <div style={s.offlinePill}>⚠️ Офлайн (проблема с БД)</div>}
-          {online  && <div style={{...s.syncPill, opacity: syncBanner ? 1 : 0}}>🔄 Данные сохранены</div>}
+          {!online && <div style={s.offlinePill}>⚠️ Офлайн</div>}
+          {pendingCount > 0 && <div style={s.pendingPill}>📱 {pendingCount} в очереди</div>}
+          {online && pendingCount === 0 && <div style={{...s.syncPill, opacity: syncBanner ? 1 : 0}}>🔄 Сохранено</div>}
         </div>
 
         <div style={s.tabBar}>
@@ -296,6 +366,7 @@ function LogTab({ addRecord, apts, maids, linen }) {
   const [aptSearch, setAptSearch] = useState("");
   const [form, setForm]           = useState({date:today(),apartment:"",maid:"",linen:{},consumables:"",notes:"",photos:[]});
   const [saved, setSaved]         = useState(false);
+  const [savedMsg, setSavedMsg]   = useState("");
   const [saving, setSaving]       = useState(false);
   const photoRef                  = useRef();
 
@@ -326,34 +397,45 @@ function LogTab({ addRecord, apts, maids, linen }) {
     }
     setSaving(true);
     try {
-      const uploadedUrls = [];
+      const offlinePreviews = form.photos.map(p => p.preview);
+      let uploadedUrls = [];
+      let photoUploadFailed = false;
+
       for (const photo of form.photos) {
-        const fileName = `${Date.now()}_${uid()}.jpg`;
-        const { data, error: uploadError } = await supabase.storage
-          .from('laundry')
-          .upload(fileName, photo.blob, { contentType: 'image/jpeg' });
-        if (uploadError) {
-          console.error("Помилка завантаження фото:", uploadError.message);
-          continue;
+        try {
+          const fileName = `${Date.now()}_${uid()}.jpg`;
+          const { data, error: uploadError } = await supabase.storage
+            .from('laundry')
+            .upload(fileName, photo.blob, { contentType: 'image/jpeg' });
+          if (uploadError) throw uploadError;
+          const { data: urlData } = supabase.storage
+            .from('laundry')
+            .getPublicUrl(data.path);
+          uploadedUrls.push(urlData.publicUrl);
+        } catch {
+          photoUploadFailed = true;
         }
-        const { data: urlData } = supabase.storage
-          .from('laundry')
-          .getPublicUrl(data.path);
-        uploadedUrls.push(urlData.publicUrl);
       }
 
-      await addRecord({
+      const record = {
         apartment:   form.apartment,
         maid:        form.maid,
         date:        form.date,
         linen:       form.linen,
         consumables: form.consumables,
         notes:       form.notes,
-        photos:      uploadedUrls,
-      });
+        photos:      photoUploadFailed ? [] : uploadedUrls,
+      };
 
+      const result = await addRecord(record, offlinePreviews);
+
+      if (result.offline) {
+        setSavedMsg("📱 Сохранено офлайн — синхронизируется при подключении");
+      } else {
+        setSavedMsg("✓ Запись сохранена!");
+      }
       setSaved(true);
-      setTimeout(() => setSaved(false), 2500);
+      setTimeout(() => setSaved(false), 3000);
       setForm({ date: today(), apartment: "", maid: "", linen: {}, consumables: "", notes: "", photos: [] });
       setAptSearch("");
       setStep(1);
@@ -371,7 +453,7 @@ function LogTab({ addRecord, apts, maids, linen }) {
   
   return (
     <div style={s.page}>
-      {saved && <div style={s.savedBanner}>✓ Запись сохранена!</div>}
+      {saved && <div style={s.savedBanner}>{savedMsg}</div>}
 
       {step===1 && <>
         <div style={s.sL}>Выберите квартиру</div>
@@ -513,7 +595,7 @@ function HistoryTab({ records, deleteRecord, linen }) {
             <div key={r.id} style={s.card}>
               <div onClick={()=>setExpanded(isOpen?null:r.id)} style={s.cardHeader}>
                 <div>
-                  <div style={s.cardApt}>🏠 {r.apartment}</div>
+                  <div style={s.cardApt}>🏠 {r.apartment} {r._offline && <span style={s.pendingPill}>ожидает синхр.</span>}</div>
                   <div style={s.cardMeta}>
                     👤 {r.maid} · 📅 {fmtDate(r.date)}
                     {total>0 && <span style={s.cntBadge}>{total} ед.</span>}
@@ -934,6 +1016,7 @@ const s = {
   consumBox:       { background:"#FFFBF0", border:"1px solid #F0E6CC", borderRadius:10, padding:"10px 12px", marginTop:10 },
   syncPill:        { fontSize:11, color:"#34C759", background:"#E8F9ED", border:"none", borderRadius:20, padding:"4px 10px", transition:"opacity 0.4s", whiteSpace:"nowrap", fontWeight:500 },
   offlinePill:     { fontSize:11, color:"#FF9500", background:"#FFF3CD", border:"none", borderRadius:20, padding:"4px 10px", whiteSpace:"nowrap", fontWeight:500 },
+  pendingPill:     { fontSize:11, color:"#5856D6", background:"#EDEDFA", border:"none", borderRadius:20, padding:"4px 10px", whiteSpace:"nowrap", fontWeight:500 },
   discardBtn:      { background:"none", border:"1px solid var(--accent-dim)", borderRadius:10, color:"var(--accent)", fontSize:12, padding:"6px 12px", cursor:"pointer", fontFamily:"inherit", fontWeight:500 },
   lockBtn:         { background:"none", border:brd, borderRadius:10, color:"#8E8E93", fontSize:12, padding:"6px 12px", cursor:"pointer", fontFamily:"inherit", fontWeight:500 },
   sectionTabs:     { display:"flex", gap:8, marginBottom:4 },
