@@ -448,11 +448,19 @@ function LogTab({ addRecord, apts, maids, linen }) {
         }
       }
 
+      const linenReadable = {};
+      for (const [id, qty] of Object.entries(form.linen)) {
+        if (id === "_no_linen") { linenReadable._no_linen = true; continue; }
+        const item = linen.find(l => l.id === id);
+        const key = item ? `${item.icon} ${item.label}` : id;
+        linenReadable[key] = qty;
+      }
+
       const record = {
         apartment:   form.apartment,
         maid:        form.maid,
         date:        form.date,
-        linen:       form.linen,
+        linen:       linenReadable,
         consumables: form.consumables,
         notes:       form.notes,
         photos:      photoUploadFailed ? [] : uploadedUrls,
@@ -684,15 +692,12 @@ function HistoryTab({ records, deleteRecord, updateRecord, linen, maids, apts })
                 {r.linen?._no_linen && <div style={{background:"#FFF0F0",border:"1px solid #FFD4D4",borderRadius:12,padding:"10px 14px",textAlign:"center",fontSize:14,fontWeight:600,color:"#FF3B30",marginBottom:8}}>⚠️ Нет белья</div>}
                 {!r.linen?._no_linen && linenEntries.length>0 && <>
                   <div style={s.subLabel}>Бельё</div>
-                  {linenEntries.map(([id,qty])=>{
-                    const item = linenMap[id];
-                    return (
-                      <div key={id} style={s.linenRowSmall}>
-                        <span>{item ? `${item.icon} ${item.label}` : id}</span>
-                        <span style={s.qtyBadge}>{qty}</span>
-                      </div>
-                    );
-                  })}
+                  {linenEntries.map(([key,qty])=>(
+                    <div key={key} style={s.linenRowSmall}>
+                      <span>{key}</span>
+                      <span style={s.qtyBadge}>{qty}</span>
+                    </div>
+                  ))}
                 </>}
                 {r.photos?.length>0 && <>
                   <div style={s.subLabel}>Фото — нажмите чтобы открыть</div>
@@ -721,32 +726,50 @@ function HistoryTab({ records, deleteRecord, updateRecord, linen, maids, apts })
 }
 
 function EditRecordForm({ record, linen, maids, apts, onSave, onCancel }) {
-  const [form, setForm] = useState({
-    apartment: record.apartment || "",
-    maid: record.maid || "",
-    date: record.date || today(),
-    linen: record.linen || {},
-    consumables: record.consumables || "",
-    notes: record.notes || "",
+  const [form, setForm] = useState(() => {
+    const linenById = {};
+    const recLinen = record.linen || {};
+    for (const [key, qty] of Object.entries(recLinen)) {
+      if (key === "_no_linen") { linenById._no_linen = true; continue; }
+      const item = linen.find(l => `${l.icon} ${l.label}` === key);
+      linenById[item ? item.id : key] = qty;
+    }
+    return {
+      apartment: record.apartment || "",
+      maid: record.maid || "",
+      date: record.date || today(),
+      linen: linenById,
+      consumables: record.consumables || "",
+    };
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
   function setQty(id, val) {
     const num = val === "" ? "" : Math.max(0, parseInt(val) || 0);
-    setForm(f => ({ ...f, linen: { ...f.linen, [id]: num } }));
+    setForm(f => {
+      const newLinen = { ...f.linen, [id]: num };
+      delete newLinen._no_linen;
+      return { ...f, linen: newLinen };
+    });
   }
 
   async function handleSave() {
     if (!form.apartment || !form.maid) { alert("Выберите квартиру и сотрудника!"); return; }
     setSaving(true);
+    const linenReadable = {};
+    for (const [id, qty] of Object.entries(form.linen)) {
+      if (id === "_no_linen") { linenReadable._no_linen = true; continue; }
+      const item = linen.find(l => l.id === id);
+      const key = item ? `${item.icon} ${item.label}` : id;
+      linenReadable[key] = qty;
+    }
     const res = await onSave({
       apartment: form.apartment,
       maid: form.maid,
       date: form.date,
-      linen: form.linen,
+      linen: linenReadable,
       consumables: form.consumables,
-      notes: form.notes,
     });
     setSaving(false);
     if (res.ok) {
