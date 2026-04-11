@@ -433,7 +433,12 @@ function LogTab({ addRecord, apts, maids, linen }) {
         <div style={s.photoRow}>
           {form.photos.map((src,i)=>(
             <div key={i} style={s.thumbWrap}>
-              <img src={src} alt="" style={s.thumb}/>
+              <img 
+                src={src instanceof File || src instanceof Blob ? URL.createObjectURL(src) : src} 
+                alt="" 
+                style={s.thumb} 
+              />
+
               <button onClick={()=>setForm(f=>({...f,photos:f.photos.filter((_,idx)=>idx!==i)}))} style={s.thumbDel}>✕</button>
             </div>
           ))}
