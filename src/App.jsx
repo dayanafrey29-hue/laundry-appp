@@ -22,11 +22,11 @@ const DEFAULT_APTS  = ["101","102","103","201","202","203"];
 const DEFAULT_MAIDS = ["Анна","Мария","Светлана","Ольга"];
 
 const THEMES = [
-  { id:"blue",    label:"Лаванда",    accent:"#7B8CDE", dark:"#5A6ABF", dim:"#E8EBFA" },
-  { id:"rose",    label:"Розовый",    accent:"#D4849A", dark:"#B86B82", dim:"#F5E0E6" },
-  { id:"green",   label:"Мята",       accent:"#6BBF8A", dark:"#4EA06E", dim:"#DFF5E7" },
-  { id:"peach",   label:"Персик",     accent:"#E0976E", dark:"#C47A50", dim:"#FAE8DA" },
-  { id:"purple",  label:"Фиалка",     accent:"#A78BDB", dark:"#8568BF", dim:"#EDE5FA" },
+  { id:"blue",    label:"Лаванда",    accent:"#8B9ACA", dark:"#6B7DB5", dim:"#EDEEF6" },
+  { id:"rose",    label:"Розовый",    accent:"#C49AAD", dark:"#A6788E", dim:"#F3E8EC" },
+  { id:"green",   label:"Мята",       accent:"#7DB896", dark:"#5F9C7A", dim:"#E6F2EB" },
+  { id:"peach",   label:"Персик",     accent:"#CDA082", dark:"#B08568", dim:"#F3ECE5" },
+  { id:"purple",  label:"Фиалка",     accent:"#9F92C8", dark:"#7E6EAD", dim:"#EDEBF5" },
 ];
 
 function applyTheme(id) {
@@ -40,11 +40,11 @@ function applyTheme(id) {
 applyTheme("blue");
 
 const BG_THEMES = [
-  { id:"snow",    label:"Снег",     bg:"#F2F2F7", bg2:"#FFFFFF", bg3:"#E5E5EA" },
-  { id:"cream",   label:"Крем",     bg:"#FAF6F0", bg2:"#FFFFFF", bg3:"#F0EBE2" },
-  { id:"sky",     label:"Небо",     bg:"#EDF2FA", bg2:"#FFFFFF", bg3:"#DDE6F2" },
-  { id:"mint",    label:"Мята",     bg:"#EDF7F0", bg2:"#FFFFFF", bg3:"#DBF0E2" },
-  { id:"blush",   label:"Румянец",  bg:"#FAF0F2", bg2:"#FFFFFF", bg3:"#F2DEE3" },
+  { id:"snow",    label:"Снег",     bg:"#F5F5F7", bg2:"#FFFFFF", bg3:"#EBEBF0" },
+  { id:"cream",   label:"Крем",     bg:"#F8F6F3", bg2:"#FFFFFF", bg3:"#F0EDE8" },
+  { id:"sky",     label:"Небо",     bg:"#F2F4F8", bg2:"#FFFFFF", bg3:"#E8ECF2" },
+  { id:"mint",    label:"Мята",     bg:"#F2F6F4", bg2:"#FFFFFF", bg3:"#E6EDE9" },
+  { id:"blush",   label:"Румянец",  bg:"#F7F3F4", bg2:"#FFFFFF", bg3:"#EDE8EA" },
 ];
 
 function applyBg(id) {
@@ -1039,7 +1039,7 @@ const s = {
   lightboxImg:     { maxWidth:"100%", maxHeight:"100%", objectFit:"contain", borderRadius:12, cursor:"default", boxShadow:"0 8px 40px rgba(0,0,0,0.5)" },
   lightboxClose:   { position:"fixed", top:16, right:16, width:36, height:36, borderRadius:"50%", background:"rgba(255,255,255,0.18)", border:"none", color:"#fff", fontSize:18, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", zIndex:201 },
   addPhotoBtn:     { width:72, height:72, background:"var(--bg2)", border:"1.5px dashed #C7C7CC", borderRadius:12, color:"#8E8E93", fontSize:18, cursor:"pointer", fontFamily:"inherit", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:2 },
-  saveBtn:         { width:"100%", marginTop:20, padding:16, background:"var(--accent-grad)", border:"none", borderRadius:14, color:"#fff", fontSize:16, fontFamily:"inherit", fontWeight:600, cursor:"pointer", letterSpacing:-0.2, boxShadow:"0 2px 10px rgba(0,0,0,0.1)" },
+  saveBtn:         { width:"100%", marginTop:20, padding:16, background:"var(--accent-grad)", border:"none", borderRadius:14, color:"#fff", fontSize:16, fontFamily:"inherit", fontWeight:600, cursor:"pointer", letterSpacing:-0.2, boxShadow:"0 2px 8px rgba(0,0,0,0.06)" },
   saveBtnOff:      { background:"var(--bg3)", color:"#C7C7CC", cursor:"not-allowed", boxShadow:"none" },
   savedBanner:     { background:"#E8F9ED", border:"none", color:"#34C759", borderRadius:12, padding:"12px 16px", textAlign:"center", fontSize:14, marginBottom:16, fontWeight:600 },
   emptyHint:       { background:"var(--bg2)", border:"1.5px dashed #C7C7CC", borderRadius:12, padding:"16px", textAlign:"center", fontSize:13, color:"#8E8E93" },
