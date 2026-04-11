@@ -834,8 +834,19 @@ function TaskTab({ apts, linen, syncKey }) {
   }
 
   function saveToHistory() {
-    const entry = { id: uid(), date: orderDate, items: orders, createdAt: new Date().toISOString() };
-    const updated = [entry, ...history].slice(0, 50);
+    const existing = history.find(h => h.date === orderDate);
+    let updated;
+    if (existing) {
+      const mergedApts = new Map();
+      for (const item of existing.items) mergedApts.set(item.apt, item);
+      for (const item of orders) mergedApts.set(item.apt, item);
+      const mergedItems = [...mergedApts.values()].sort((a, b) => a.apt.localeCompare(b.apt, "ru", { numeric: true }));
+      updated = history.map(h => h.id === existing.id ? { ...h, items: mergedItems, createdAt: new Date().toISOString() } : h);
+      updated.sort((a, b) => b.date.localeCompare(a.date));
+    } else {
+      const entry = { id: uid(), date: orderDate, items: orders, createdAt: new Date().toISOString() };
+      updated = [entry, ...history].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 50);
+    }
     setHistory(updated);
     syncKey('order_history', updated);
   }
