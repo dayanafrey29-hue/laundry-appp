@@ -548,12 +548,13 @@ function HistoryTab({ records, deleteRecord, linen }) {
                 {r.photos?.length>0 && <>
                   <div style={s.subLabel}>Фото — нажмите чтобы открыть</div>
                   <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-                    {r.photos.map((src,i)=>(
-                      <div key={i} onClick={()=>setLightbox(src)} style={s.photoThumbWrap}>
-                        <img src={src} alt="" style={s.photoThumb}/>
+                    {r.photos && Array.isArray(r.photos) && r.photos.map((src, i) => (
+                      <div key={i} onClick={() => setLightbox(src)} style={s.photoThumbWrap}>
+                        <img src={src} alt="" style={s.photoThumb} />
                         <div style={s.photoThumbHint}>🔍</div>
                       </div>
                     ))}
+
                   </div>
                 </>}
                 {r.consumables?.trim() && <div style={s.consumBox}>
