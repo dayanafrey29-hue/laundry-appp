@@ -1,44 +1,47 @@
-# Учёт белья — Laundry Tracker
+# TCA — Laundry Tracker
 
-A Russian-language laundry tracking app with real-time cross-device synchronization.
+A Russian-language laundry tracking PWA with iOS-style design and Supabase backend.
 
 ## Stack
 
 - **Frontend**: React 18 + Vite (port 5000)
-- **Backend**: Express.js (port 3001) — REST API + SSE for real-time sync
-- **Database**: Replit PostgreSQL — persistent storage via `laundry_store` table
-- **Offline fallback**: localStorage cache when server is unavailable
+- **Backend**: Supabase (PostgreSQL + Storage)
+- **Font**: Inter (Google Fonts)
+- **Deployment**: Vercel
 
 ## Features
 
-- **Log tab**: Select apartment → enter date, maid, linen quantities, photos, consumables needed, notes
+- **Log tab**: Select apartment → enter date, maid, linen quantities, photos, consumables, notes
 - **History tab**: Browse, search and filter past records; expand for details; delete entries
-- **Settings tab**: Password-protected (code: `2026`); draft-based editor for apartments, maids, linen types; explicit save button
-- **Real-time sync**: Changes on any device appear instantly on all others via Server-Sent Events
-- **Offline mode**: Falls back to localStorage if server is unreachable
+- **Settings tab**: Password-protected (code: `2026`); draft-based editor for apartments, maids, linen types; color & background themes
+- **Photo upload**: Images compressed to JPEG (1200px max, quality 0.6), uploaded to Supabase Storage bucket `laundry`, stored as public URLs
+- **Themes**: 5 pastel accent themes (Лаванда, Рожевий, М'ята, Персик, Фіалка) + 5 light background themes (Сніг, Крем, Небо, М'ята, Рум'яна)
 
-## Running
+## Design
 
-Two workflows must run together:
-```bash
-node server.js       # API Server (port 3001)
-npm run dev          # Frontend (port 5000)
-```
+- iOS-style: light backgrounds, subtle borders (`rgba(0,0,0,0.06)`), rounded corners (12-14px), Inter font, backdrop blur on header
+- CSS variables: `--accent`, `--accent-dark`, `--accent-dim`, `--accent-grad`, `--bg`, `--bg2`, `--bg3`
+- All themes saved to Supabase `laundry_store` table; legacy dark theme IDs auto-migrated to new defaults
 
 ## Architecture
 
 ```
 src/
-  App.jsx    # Full React SPA
-  main.jsx   # Entry point
-server.js    # Express API + SSE broadcast server
+  App.jsx          # Full React SPA (single file)
+  main.jsx         # Entry point
+supabaseClient.js  # Supabase client init
 index.html
-vite.config.js   # Proxies /api/* → localhost:3001
+vite.config.js
 package.json
 ```
 
-## Database
+## Database (Supabase)
 
-Table: `laundry_store (key TEXT PRIMARY KEY, value TEXT, updated_at TIMESTAMP)`
+- `laundry_records`: id(uuid), apartment(text), maid(text), date(text), linen(jsonb), consumables(text), notes(text), photos(jsonb), created_at(timestamptz)
+- `laundry_store`: key(text PK), value(jsonb) — keys: apts, maids, linen, theme, bg
+- Storage bucket: `laundry` (public) — photo uploads
 
-Keys: `records`, `apts`, `maids`, `linen`
+## Environment Variables
+
+- `VITE_SUPABASE_URL` — Supabase project URL
+- `VITE_SUPABASE_ANON_KEY` — Supabase anon key

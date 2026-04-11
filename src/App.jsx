@@ -22,11 +22,11 @@ const DEFAULT_APTS  = ["101","102","103","201","202","203"];
 const DEFAULT_MAIDS = ["Анна","Мария","Светлана","Ольга"];
 
 const THEMES = [
-  { id:"gold",    label:"Золотий",    accent:"#c9a84c", dark:"#a07830", dim:"#3a2f20" },
-  { id:"blue",    label:"Синій",      accent:"#5b9bd5", dark:"#3a72aa", dim:"#1a2a3a" },
-  { id:"green",   label:"Зелений",    accent:"#5cb87a", dark:"#3a9060", dim:"#1a3020" },
-  { id:"purple",  label:"Фіолет",     accent:"#9c7fd4", dark:"#7458b0", dim:"#2a1a40" },
-  { id:"rose",    label:"Рожевий",    accent:"#d4709c", dark:"#b04878", dim:"#3a1a28" },
+  { id:"blue",    label:"Лаванда",    accent:"#7B8CDE", dark:"#5A6ABF", dim:"#E8EBFA" },
+  { id:"rose",    label:"Рожевий",    accent:"#D4849A", dark:"#B86B82", dim:"#F5E0E6" },
+  { id:"green",   label:"М'ята",      accent:"#6BBF8A", dark:"#4EA06E", dim:"#DFF5E7" },
+  { id:"peach",   label:"Персик",     accent:"#E0976E", dark:"#C47A50", dim:"#FAE8DA" },
+  { id:"purple",  label:"Фіалка",     accent:"#A78BDB", dark:"#8568BF", dim:"#EDE5FA" },
 ];
 
 function applyTheme(id) {
@@ -37,14 +37,14 @@ function applyTheme(id) {
   r.setProperty("--accent-dim",  t.dim);
   r.setProperty("--accent-grad", `linear-gradient(135deg,${t.accent},${t.dark})`);
 }
-applyTheme("gold");
+applyTheme("blue");
 
 const BG_THEMES = [
-  { id:"dark",    label:"Тёмный",   bg:"#111318", bg2:"#161a24", bg3:"#1c2030" },
-  { id:"deeper",  label:"Глубокий", bg:"#0a0d12", bg2:"#0f1320", bg3:"#151828" },
-  { id:"coffee",  label:"Кофе",     bg:"#120d0a", bg2:"#1a1210", bg3:"#221815" },
-  { id:"forest",  label:"Лес",      bg:"#0a100e", bg2:"#0f1a18", bg3:"#162220" },
-  { id:"navy",    label:"Ночь",     bg:"#0b0e18", bg2:"#111520", bg3:"#171c2e" },
+  { id:"snow",    label:"Сніг",     bg:"#F2F2F7", bg2:"#FFFFFF", bg3:"#E5E5EA" },
+  { id:"cream",   label:"Крем",     bg:"#FAF6F0", bg2:"#FFFFFF", bg3:"#F0EBE2" },
+  { id:"sky",     label:"Небо",     bg:"#EDF2FA", bg2:"#FFFFFF", bg3:"#DDE6F2" },
+  { id:"mint",    label:"М'ята",    bg:"#EDF7F0", bg2:"#FFFFFF", bg3:"#DBF0E2" },
+  { id:"blush",   label:"Рум'яна",  bg:"#FAF0F2", bg2:"#FFFFFF", bg3:"#F2DEE3" },
 ];
 
 function applyBg(id) {
@@ -54,7 +54,7 @@ function applyBg(id) {
   r.setProperty("--bg2", t.bg2);
   r.setProperty("--bg3", t.bg3);
 }
-applyBg("dark");
+applyBg("snow");
 
 function today() {
   const d = new Date();
@@ -68,10 +68,12 @@ function fmtDate(d) {
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
 
 function compressImage(file, maxPx = 1200, quality = 0.6) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Не вдалося прочитати файл"));
     reader.onload = (e) => {
       const img = new Image();
+      img.onerror = () => reject(new Error("Не вдалося завантажити зображення"));
       img.onload = () => {
         const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
         const w = Math.round(img.width  * scale);
@@ -80,7 +82,10 @@ function compressImage(file, maxPx = 1200, quality = 0.6) {
         canvas.width = w; canvas.height = h;
         canvas.getContext("2d").drawImage(img, 0, 0, w, h);
         const preview = canvas.toDataURL("image/jpeg", quality);
-        canvas.toBlob(blob => resolve({ preview, blob }), "image/jpeg", quality);
+        canvas.toBlob(blob => {
+          if (!blob) return reject(new Error("Не вдалося стиснути зображення"));
+          resolve({ preview, blob });
+        }, "image/jpeg", quality);
       };
       img.src = e.target.result;
     };
@@ -124,11 +129,15 @@ export default function App() {
         const a  = map['apts']  || DEFAULT_APTS;
         const m  = map['maids'] || DEFAULT_MAIDS;
         const l  = map['linen'] || DEFAULT_LINEN;
-        const th = map['theme'] || 'gold';
-        const bg = map['bg']    || 'dark';
+        const rawTh = map['theme'] || 'blue';
+        const rawBg = map['bg']    || 'snow';
+        const th = THEMES.find(x => x.id === rawTh) ? rawTh : 'blue';
+        const bg = BG_THEMES.find(x => x.id === rawBg) ? rawBg : 'snow';
         setApts(a); setMaids(m); setLinen(l);
         setTheme(th); applyTheme(th);
         setBgTheme(bg); applyBg(bg);
+        if (th !== rawTh) syncKey('theme', th);
+        if (bg !== rawBg) syncKey('bg', bg);
         if (!map['apts'])  syncKey('apts',  a);
         if (!map['maids']) syncKey('maids', m);
         if (!map['linen']) syncKey('linen', l);
@@ -188,7 +197,7 @@ export default function App() {
       <div style={s.header}>
         <span style={{fontSize:26}}>🧺</span>
         <div style={{flex:1}}>
-          <div style={s.headerTitle}>Учёт белья</div>
+          <div style={s.headerTitle}>TCA</div>
           <div style={s.headerSub}>Журнал прачечной</div>
         </div>
         {!online && <div style={s.offlinePill}>⚠️ Офлайн (проблема с БД)</div>}
@@ -239,8 +248,8 @@ function PasswordGate({ onUnlock }) {
   return (
     <div style={{padding:"60px 32px 32px", textAlign:"center"}}>
       <div style={{fontSize:48, marginBottom:16}}>🔒</div>
-      <div style={{fontSize:17, fontWeight:"bold", marginBottom:6}}>Настройки защищены</div>
-      <div style={{fontSize:13, color:"#666", marginBottom:32}}>Введите пароль для доступа</div>
+      <div style={{fontSize:17, fontWeight:600, marginBottom:6, color:"#1C1C1E"}}>Настройки защищены</div>
+      <div style={{fontSize:13, color:"#8E8E93", marginBottom:32}}>Введите пароль для доступа</div>
 
       <div style={{animation: shake ? "shake 0.4s ease" : "none", marginBottom:16}}>
         <style>{`@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}`}</style>
@@ -257,11 +266,11 @@ function PasswordGate({ onUnlock }) {
             textAlign:"center",
             fontSize:24,
             letterSpacing:8,
-            border: err ? "1px solid #c03030" : "1px solid #2a2f3e",
+            border: err ? "1px solid #FF3B30" : brd,
             transition:"border 0.2s",
           }}
         />
-        {err && <div style={{fontSize:12,color:"#c03030",marginTop:8}}>Неверный пароль</div>}
+        {err && <div style={{fontSize:12,color:"#FF3B30",marginTop:8}}>Неверный пароль</div>}
       </div>
 
       <button onClick={tryUnlock} style={{...s.saveBtn, marginTop:0}}>
@@ -616,13 +625,13 @@ function SettingsTab({ apts, saveApts, maids, saveMaids, linen, saveLinen, theme
         {THEMES.map(t=>(
           <button key={t.id} onClick={()=>saveTheme(t.id)} style={{
             display:"flex", flexDirection:"column", alignItems:"center", gap:5,
-            background: theme===t.id ? "var(--bg3)" : "transparent",
-            border: `2px solid ${theme===t.id ? t.accent : "#2a2f3e"}`,
+            background: theme===t.id ? t.dim : "transparent",
+            border: `2px solid ${theme===t.id ? t.accent : "rgba(0,0,0,0.08)"}`,
             borderRadius:12, padding:"10px 12px", cursor:"pointer", fontFamily:"inherit",
-            transition:"border 0.2s",
+            transition:"all 0.2s",
           }}>
             <div style={{width:22,height:22,borderRadius:"50%",background:`linear-gradient(135deg,${t.accent},${t.dark})`}}/>
-            <span style={{fontSize:10,color: theme===t.id ? t.accent : "#666"}}>{t.label}</span>
+            <span style={{fontSize:10,color: theme===t.id ? t.dark : "#8E8E93", fontWeight:theme===t.id ? 600 : 400}}>{t.label}</span>
           </button>
         ))}
       </div>
@@ -632,13 +641,13 @@ function SettingsTab({ apts, saveApts, maids, saveMaids, linen, saveLinen, theme
         {BG_THEMES.map(t=>(
           <button key={t.id} onClick={()=>saveBgTheme(t.id)} style={{
             display:"flex", flexDirection:"column", alignItems:"center", gap:5,
-            background: bgTheme===t.id ? "var(--bg3)" : "transparent",
-            border: `2px solid ${bgTheme===t.id ? "var(--accent)" : "#2a2f3e"}`,
+            background: bgTheme===t.id ? "var(--accent-dim)" : "transparent",
+            border: `2px solid ${bgTheme===t.id ? "var(--accent)" : "rgba(0,0,0,0.08)"}`,
             borderRadius:12, padding:"10px 12px", cursor:"pointer", fontFamily:"inherit",
-            transition:"border 0.2s",
+            transition:"all 0.2s",
           }}>
-            <div style={{width:22,height:22,borderRadius:"50%",background:t.bg,border:"1px solid #3a3f55"}}/>
-            <span style={{fontSize:10,color: bgTheme===t.id ? "var(--accent)" : "#666"}}>{t.label}</span>
+            <div style={{width:22,height:22,borderRadius:"50%",background:t.bg,border:"1px solid rgba(0,0,0,0.08)"}}/>
+            <span style={{fontSize:10,color: bgTheme===t.id ? "var(--accent-dark)" : "#8E8E93", fontWeight:bgTheme===t.id ? 600 : 400}}>{t.label}</span>
           </button>
         ))}
       </div>
@@ -772,11 +781,11 @@ function LinenEditor({ linen, saveLinen }) {
         <div style={{fontSize:12,color:"#888",marginBottom:10,letterSpacing:0.5}}>ДОБАВИТЬ ПОЗИЦИЮ</div>
 
         <div style={{marginBottom:10}}>
-          <div style={{fontSize:11,color:"#666",marginBottom:6}}>Иконка:</div>
+          <div style={{fontSize:11,color:"#8E8E93",marginBottom:6}}>Иконка:</div>
           <button onClick={()=>setShowIconPicker(!showIconPicker)}
-            style={{...s.iconPickerBtn, borderColor: showIconPicker?"#c9a84c":"#3a3f55"}}>
+            style={{...s.iconPickerBtn, borderColor: showIconPicker?"var(--accent)":"rgba(0,0,0,0.08)"}}>
             <span style={{fontSize:20}}>{newIcon}</span>
-            <span style={{fontSize:11,color:"#888"}}>▼</span>
+            <span style={{fontSize:11,color:"#8E8E93"}}>▼</span>
           </button>
           {showIconPicker && (
             <div style={s.iconGrid}>
@@ -857,87 +866,88 @@ function Modal({ text, onCancel, onConfirm }) {
 }
 
 // ─── STYLES ──────────────────────────────────────────────────────
+const brd = "1px solid rgba(0,0,0,0.06)";
 const s = {
-  root:            { minHeight:"100vh", background:"var(--bg)", color:"#ddd8cc", fontFamily:"'Georgia','Times New Roman',serif", maxWidth:480, margin:"0 auto", paddingBottom:70 },
-  header:          { display:"flex", alignItems:"center", gap:12, padding:"22px 20px 14px", background:"var(--bg2)", borderBottom:"1px solid #252a38", position:"sticky", top:0, zIndex:10 },
-  headerTitle:     { fontSize:19, fontWeight:"bold", letterSpacing:0.5 },
-  headerSub:       { fontSize:11, color:"#666", letterSpacing:1, textTransform:"uppercase" },
-  tabBar:          { display:"flex", borderBottom:"1px solid #252a38", position:"sticky", top:64, zIndex:9, background:"var(--bg)" },
-  tab:             { flex:1, padding:"10px 0", background:"transparent", border:"none", borderBottom:"2px solid transparent", color:"#666", fontSize:13, fontFamily:"inherit", cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", gap:2, transition:"all 0.2s" },
-  tabActive:       { background:"var(--bg2)", borderBottom:"2px solid var(--accent)", color:"var(--accent)", fontWeight:"bold" },
+  root:            { minHeight:"100vh", background:"var(--bg)", color:"#1C1C1E", fontFamily:"'Inter','SF Pro Display',-apple-system,BlinkMacSystemFont,sans-serif", maxWidth:480, margin:"0 auto", paddingBottom:70 },
+  header:          { display:"flex", alignItems:"center", gap:12, padding:"18px 20px 14px", background:"var(--bg2)", borderBottom:brd, position:"sticky", top:0, zIndex:10, backdropFilter:"blur(12px)", WebkitBackdropFilter:"blur(12px)" },
+  headerTitle:     { fontSize:22, fontWeight:700, letterSpacing:-0.3, color:"#1C1C1E" },
+  headerSub:       { fontSize:11, color:"#8E8E93", letterSpacing:0.6, textTransform:"uppercase", fontWeight:500 },
+  tabBar:          { display:"flex", borderBottom:brd, position:"sticky", top:56, zIndex:9, background:"var(--bg)", padding:"0 16px" },
+  tab:             { flex:1, padding:"10px 0", background:"transparent", border:"none", borderBottom:"2.5px solid transparent", color:"#8E8E93", fontSize:13, fontFamily:"inherit", cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", gap:2, transition:"all 0.2s", fontWeight:500 },
+  tabActive:       { borderBottom:"2.5px solid var(--accent)", color:"var(--accent)", fontWeight:600 },
   page:            { padding:"20px 16px" },
-  sL:              { fontSize:10, color:"#666", textTransform:"uppercase", letterSpacing:1.4, marginBottom:8, marginTop:18 },
-  input:           { width:"100%", padding:"11px 13px", background:"var(--bg3)", border:"1px solid #2a2f3e", borderRadius:10, color:"#ddd8cc", fontSize:14, fontFamily:"inherit", boxSizing:"border-box", outline:"none", WebkitAppearance:"none" },
+  sL:              { fontSize:11, color:"#8E8E93", textTransform:"uppercase", letterSpacing:0.8, marginBottom:8, marginTop:18, fontWeight:600 },
+  input:           { width:"100%", padding:"12px 14px", background:"var(--bg2)", border:brd, borderRadius:12, color:"#1C1C1E", fontSize:15, fontFamily:"inherit", boxSizing:"border-box", outline:"none", WebkitAppearance:"none", boxShadow:"0 1px 3px rgba(0,0,0,0.04)" },
   sIcon:           { position:"absolute", left:13, top:"50%", transform:"translateY(-50%)", fontSize:15, pointerEvents:"none" },
   aptGrid:         { display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:8 },
-  aptBtn:          { padding:"12px 4px", background:"var(--bg3)", border:"1px solid #2a2f3e", borderRadius:10, color:"#ddd8cc", fontSize:14, fontFamily:"inherit", cursor:"pointer" },
+  aptBtn:          { padding:"12px 4px", background:"var(--bg2)", border:brd, borderRadius:12, color:"#1C1C1E", fontSize:14, fontFamily:"inherit", cursor:"pointer", fontWeight:500, boxShadow:"0 1px 3px rgba(0,0,0,0.04)", transition:"all 0.15s" },
   aptHeader:       { display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:4 },
-  aptBadge:        { background:"#1e2844", border:"1px solid #2e3a5e", borderRadius:20, padding:"6px 14px", fontSize:14, color:"#8ab4f8", fontWeight:"bold" },
-  backBtn:         { background:"none", border:"none", color:"var(--accent)", fontSize:13, cursor:"pointer", fontFamily:"inherit", padding:0 },
+  aptBadge:        { background:"var(--accent-dim)", border:"none", borderRadius:20, padding:"6px 14px", fontSize:14, color:"var(--accent-dark)", fontWeight:600 },
+  backBtn:         { background:"none", border:"none", color:"var(--accent)", fontSize:13, cursor:"pointer", fontFamily:"inherit", padding:0, fontWeight:500 },
   row2:            { display:"flex", gap:12 },
-  linenTable:      { borderRadius:12, border:"1px solid #252a38", overflow:"hidden" },
-  linenRow:        { display:"flex", alignItems:"center", padding:"10px 14px", borderBottom:"1px solid #1a1e2a", gap:10 },
+  linenTable:      { borderRadius:12, border:brd, overflow:"hidden", background:"var(--bg2)", boxShadow:"0 1px 3px rgba(0,0,0,0.04)" },
+  linenRow:        { display:"flex", alignItems:"center", padding:"11px 14px", borderBottom:"1px solid rgba(0,0,0,0.04)", gap:10 },
   linenIcon:       { fontSize:15, width:22, textAlign:"center", flexShrink:0 },
-  linenLabel:      { flex:1, fontSize:13, color:"#aaa", lineHeight:1.3 },
-  qtyInput:        { width:52, padding:"7px 6px", background:"var(--bg3)", border:"1px solid #3a3f55", borderRadius:8, color:"#ddd8cc", fontSize:16, fontFamily:"inherit", textAlign:"center", outline:"none", WebkitAppearance:"none", MozAppearance:"textfield" },
+  linenLabel:      { flex:1, fontSize:14, color:"#3A3A3C", lineHeight:1.3 },
+  qtyInput:        { width:52, padding:"8px 6px", background:"var(--bg)", border:brd, borderRadius:10, color:"#1C1C1E", fontSize:16, fontFamily:"inherit", textAlign:"center", outline:"none", WebkitAppearance:"none", MozAppearance:"textfield", fontWeight:600 },
   photoRow:        { display:"flex", flexWrap:"wrap", gap:10, marginBottom:4 },
   thumbWrap:       { position:"relative", width:72, height:72 },
-  thumb:           { width:72, height:72, objectFit:"cover", borderRadius:10, border:"1px solid #2a2f3e" },
-  thumbDel:        { position:"absolute", top:-6, right:-6, width:20, height:20, borderRadius:"50%", background:"#c03030", border:"none", color:"#fff", fontSize:11, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" },
-  photoThumbWrap:  { position:"relative", width:90, height:90, cursor:"pointer", borderRadius:10, overflow:"hidden", border:"1px solid #2a2f3e", flexShrink:0 },
+  thumb:           { width:72, height:72, objectFit:"cover", borderRadius:12, border:brd },
+  thumbDel:        { position:"absolute", top:-6, right:-6, width:20, height:20, borderRadius:"50%", background:"#FF3B30", border:"2px solid var(--bg2)", color:"#fff", fontSize:10, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700 },
+  photoThumbWrap:  { position:"relative", width:90, height:90, cursor:"pointer", borderRadius:12, overflow:"hidden", border:brd, flexShrink:0 },
   photoThumb:      { width:90, height:90, objectFit:"cover", display:"block" },
-  photoThumbHint:  { position:"absolute", bottom:0, right:0, width:24, height:24, background:"rgba(0,0,0,0.55)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, borderTopLeftRadius:6 },
-  lightboxOverlay: { position:"fixed", inset:0, background:"rgba(0,0,0,0.93)", zIndex:200, display:"flex", alignItems:"center", justifyContent:"center", padding:16, cursor:"pointer" },
-  lightboxImg:     { maxWidth:"100%", maxHeight:"100%", objectFit:"contain", borderRadius:8, cursor:"default", boxShadow:"0 4px 40px rgba(0,0,0,0.7)" },
-  lightboxClose:   { position:"fixed", top:16, right:16, width:40, height:40, borderRadius:"50%", background:"rgba(255,255,255,0.15)", border:"none", color:"#fff", fontSize:20, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", zIndex:201 },
-  addPhotoBtn:     { width:72, height:72, background:"var(--bg3)", border:"1px dashed #3a3f55", borderRadius:10, color:"#666", fontSize:18, cursor:"pointer", fontFamily:"inherit", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:2 },
-  saveBtn:         { width:"100%", marginTop:20, padding:16, background:"var(--accent-grad)", border:"none", borderRadius:12, color:"#fff", fontSize:16, fontFamily:"inherit", fontWeight:"bold", cursor:"pointer", letterSpacing:0.5 },
-  saveBtnOff:      { background:"var(--bg3)", color:"#3a3f4e", cursor:"not-allowed" },
-  savedBanner:     { background:"#1a3020", border:"1px solid #2a5030", color:"#5cd87a", borderRadius:10, padding:"12px 16px", textAlign:"center", fontSize:14, marginBottom:16, fontWeight:"bold" },
-  emptyHint:       { background:"var(--bg3)", border:"1px dashed #3a3f55", borderRadius:10, padding:"16px", textAlign:"center", fontSize:13, color:"#666" },
-  clearBtn:        { background:"none", border:"none", color:"var(--accent)", fontSize:12, cursor:"pointer", padding:"6px 0", fontFamily:"inherit" },
-  countLabel:      { fontSize:12, color:"#555", margin:"10px 0 12px" },
+  photoThumbHint:  { position:"absolute", bottom:0, right:0, width:24, height:24, background:"rgba(0,0,0,0.45)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, borderTopLeftRadius:8 },
+  lightboxOverlay: { position:"fixed", inset:0, background:"rgba(0,0,0,0.88)", zIndex:200, display:"flex", alignItems:"center", justifyContent:"center", padding:16, cursor:"pointer" },
+  lightboxImg:     { maxWidth:"100%", maxHeight:"100%", objectFit:"contain", borderRadius:12, cursor:"default", boxShadow:"0 8px 40px rgba(0,0,0,0.5)" },
+  lightboxClose:   { position:"fixed", top:16, right:16, width:36, height:36, borderRadius:"50%", background:"rgba(255,255,255,0.18)", border:"none", color:"#fff", fontSize:18, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", zIndex:201 },
+  addPhotoBtn:     { width:72, height:72, background:"var(--bg2)", border:"1.5px dashed #C7C7CC", borderRadius:12, color:"#8E8E93", fontSize:18, cursor:"pointer", fontFamily:"inherit", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:2 },
+  saveBtn:         { width:"100%", marginTop:20, padding:16, background:"var(--accent-grad)", border:"none", borderRadius:14, color:"#fff", fontSize:16, fontFamily:"inherit", fontWeight:600, cursor:"pointer", letterSpacing:-0.2, boxShadow:"0 2px 10px rgba(0,0,0,0.1)" },
+  saveBtnOff:      { background:"var(--bg3)", color:"#C7C7CC", cursor:"not-allowed", boxShadow:"none" },
+  savedBanner:     { background:"#E8F9ED", border:"none", color:"#34C759", borderRadius:12, padding:"12px 16px", textAlign:"center", fontSize:14, marginBottom:16, fontWeight:600 },
+  emptyHint:       { background:"var(--bg2)", border:"1.5px dashed #C7C7CC", borderRadius:12, padding:"16px", textAlign:"center", fontSize:13, color:"#8E8E93" },
+  clearBtn:        { background:"none", border:"none", color:"var(--accent)", fontSize:12, cursor:"pointer", padding:"6px 0", fontFamily:"inherit", fontWeight:500 },
+  countLabel:      { fontSize:12, color:"#8E8E93", margin:"10px 0 12px" },
   empty:           { textAlign:"center", padding:"60px 0" },
-  card:            { background:"var(--bg2)", borderRadius:12, border:"1px solid #252a38", marginBottom:10, overflow:"hidden" },
+  card:            { background:"var(--bg2)", borderRadius:14, border:brd, marginBottom:10, overflow:"hidden", boxShadow:"0 1px 3px rgba(0,0,0,0.04)" },
   cardHeader:      { display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px", cursor:"pointer" },
-  cardApt:         { fontWeight:"bold", fontSize:15, marginBottom:4 },
-  cardMeta:        { fontSize:12, color:"#666", display:"flex", flexWrap:"wrap", gap:5, alignItems:"center" },
-  cntBadge:        { background:"#1e2844", color:"#8ab4f8", borderRadius:10, padding:"2px 8px", fontSize:11 },
-  consumBadge:     { background:"#2a2010", color:"#e8b84b", borderRadius:10, padding:"2px 7px", fontSize:11 },
-  photoBadge:      { background:"#1a2820", color:"#6ab87a", borderRadius:10, padding:"2px 8px", fontSize:11 },
-  delBtn:          { background:"none", border:"none", color:"#444", cursor:"pointer", fontSize:15, padding:0 },
-  cardBody:        { padding:"12px 14px 14px", borderTop:"1px solid #1e2330" },
-  subLabel:        { fontSize:10, color:"#555", textTransform:"uppercase", letterSpacing:1.2, marginBottom:6, marginTop:12 },
-  linenRowSmall:   { display:"flex", justifyContent:"space-between", alignItems:"center", fontSize:13, color:"#999", padding:"5px 0", borderBottom:"1px solid #1a1e2a" },
-  qtyBadge:        { background:"#1e2844", color:"#8ab4f8", borderRadius:8, padding:"2px 10px", fontSize:13, fontWeight:"bold" },
-  consumBox:       { background:"#1e1a0e", border:"1px solid #3a2e10", borderRadius:8, padding:"10px 12px", marginTop:10 },
-  syncPill:        { fontSize:11, color:"#5cd87a", background:"#1a3020", border:"1px solid #2a5030", borderRadius:20, padding:"4px 10px", transition:"opacity 0.4s", whiteSpace:"nowrap" },
-  offlinePill:     { fontSize:11, color:"#e8b84b", background:"#2a2010", border:"1px solid #5a4010", borderRadius:20, padding:"4px 10px", whiteSpace:"nowrap" },
-  discardBtn:      { background:"none", border:"1px solid var(--accent-dim)", borderRadius:8, color:"var(--accent)", fontSize:12, padding:"6px 12px", cursor:"pointer", fontFamily:"inherit" },
-  lockBtn:         { background:"none", border:"1px solid #2a2f3e", borderRadius:8, color:"#888", fontSize:12, padding:"6px 12px", cursor:"pointer", fontFamily:"inherit" },
+  cardApt:         { fontWeight:600, fontSize:15, marginBottom:4, color:"#1C1C1E" },
+  cardMeta:        { fontSize:12, color:"#8E8E93", display:"flex", flexWrap:"wrap", gap:5, alignItems:"center" },
+  cntBadge:        { background:"var(--accent-dim)", color:"var(--accent-dark)", borderRadius:10, padding:"2px 8px", fontSize:11, fontWeight:500 },
+  consumBadge:     { background:"#FFF3CD", color:"#B8860B", borderRadius:10, padding:"2px 7px", fontSize:11, fontWeight:500 },
+  photoBadge:      { background:"#E8F9ED", color:"#34C759", borderRadius:10, padding:"2px 8px", fontSize:11, fontWeight:500 },
+  delBtn:          { background:"none", border:"none", color:"#C7C7CC", cursor:"pointer", fontSize:15, padding:0 },
+  cardBody:        { padding:"12px 14px 14px", borderTop:"1px solid rgba(0,0,0,0.04)" },
+  subLabel:        { fontSize:11, color:"#8E8E93", textTransform:"uppercase", letterSpacing:0.8, marginBottom:6, marginTop:12, fontWeight:600 },
+  linenRowSmall:   { display:"flex", justifyContent:"space-between", alignItems:"center", fontSize:13, color:"#3A3A3C", padding:"5px 0", borderBottom:"1px solid rgba(0,0,0,0.04)" },
+  qtyBadge:        { background:"var(--accent-dim)", color:"var(--accent-dark)", borderRadius:8, padding:"2px 10px", fontSize:13, fontWeight:600 },
+  consumBox:       { background:"#FFFBF0", border:"1px solid #F0E6CC", borderRadius:10, padding:"10px 12px", marginTop:10 },
+  syncPill:        { fontSize:11, color:"#34C759", background:"#E8F9ED", border:"none", borderRadius:20, padding:"4px 10px", transition:"opacity 0.4s", whiteSpace:"nowrap", fontWeight:500 },
+  offlinePill:     { fontSize:11, color:"#FF9500", background:"#FFF3CD", border:"none", borderRadius:20, padding:"4px 10px", whiteSpace:"nowrap", fontWeight:500 },
+  discardBtn:      { background:"none", border:"1px solid var(--accent-dim)", borderRadius:10, color:"var(--accent)", fontSize:12, padding:"6px 12px", cursor:"pointer", fontFamily:"inherit", fontWeight:500 },
+  lockBtn:         { background:"none", border:brd, borderRadius:10, color:"#8E8E93", fontSize:12, padding:"6px 12px", cursor:"pointer", fontFamily:"inherit", fontWeight:500 },
   sectionTabs:     { display:"flex", gap:8, marginBottom:4 },
-  sectionTab:      { flex:1, padding:"10px 6px", background:"var(--bg3)", border:"1px solid #2a2f3e", borderRadius:10, color:"#666", fontSize:12, fontFamily:"inherit", cursor:"pointer", transition:"all 0.2s" },
-  sectionTabActive:{ background:"#222840", border:"1px solid #3a4a6e", color:"#8ab4f8", fontWeight:"bold" },
-  importBtn:       { background:"var(--bg3)", border:"1px solid #3a3f55", borderRadius:8, color:"var(--accent)", fontSize:12, padding:"6px 12px", cursor:"pointer", fontFamily:"inherit" },
-  importBox:       { background:"var(--bg)", border:"1px solid #252a38", borderRadius:10, padding:14, marginBottom:14 },
-  addBtn:          { padding:"11px 14px", background:"var(--accent-grad)", border:"none", borderRadius:10, color:"#fff", fontSize:13, fontFamily:"inherit", fontWeight:"bold", cursor:"pointer", whiteSpace:"nowrap" },
-  listBox:         { background:"var(--bg)", borderRadius:10, border:"1px solid #1e2330", overflow:"hidden", maxHeight:320, overflowY:"auto" },
-  listRow:         { display:"flex", alignItems:"center", padding:"11px 14px", borderBottom:"1px solid #1a1e2a" },
-  listLabel:       { flex:1, fontSize:14 },
-  rowDelBtn:       { background:"none", border:"none", color:"#555", fontSize:14, cursor:"pointer", padding:"0 4px" },
-  cancelSmall:     { flex:1, padding:"9px 0", background:"var(--bg3)", border:"1px solid #2a2f3e", borderRadius:8, color:"#888", cursor:"pointer", fontFamily:"inherit", fontSize:13 },
-  confirmSmall:    { flex:1, padding:"9px 0", background:"var(--accent-grad)", border:"none", borderRadius:8, color:"#fff", cursor:"pointer", fontFamily:"inherit", fontSize:13, fontWeight:"bold" },
-  linenAddBox:     { background:"var(--bg3)", border:"1px solid #2a2f3e", borderRadius:12, padding:14, marginBottom:14 },
-  linenEditRow:    { display:"flex", alignItems:"center", padding:"9px 12px", borderBottom:"1px solid #1a1e2a" },
-  arrowBtn:        { background:"none", border:"none", color:"#555", fontSize:11, cursor:"pointer", padding:"1px 3px", lineHeight:1, display:"block" },
+  sectionTab:      { flex:1, padding:"10px 6px", background:"var(--bg2)", border:brd, borderRadius:10, color:"#8E8E93", fontSize:12, fontFamily:"inherit", cursor:"pointer", transition:"all 0.2s", fontWeight:500 },
+  sectionTabActive:{ background:"var(--accent-dim)", border:"1px solid var(--accent)", color:"var(--accent-dark)", fontWeight:600 },
+  importBtn:       { background:"var(--bg2)", border:brd, borderRadius:10, color:"var(--accent)", fontSize:12, padding:"6px 12px", cursor:"pointer", fontFamily:"inherit", fontWeight:500 },
+  importBox:       { background:"var(--bg)", border:brd, borderRadius:12, padding:14, marginBottom:14 },
+  addBtn:          { padding:"11px 14px", background:"var(--accent-grad)", border:"none", borderRadius:10, color:"#fff", fontSize:13, fontFamily:"inherit", fontWeight:600, cursor:"pointer", whiteSpace:"nowrap" },
+  listBox:         { background:"var(--bg2)", borderRadius:12, border:brd, overflow:"hidden", maxHeight:320, overflowY:"auto", boxShadow:"0 1px 3px rgba(0,0,0,0.04)" },
+  listRow:         { display:"flex", alignItems:"center", padding:"11px 14px", borderBottom:"1px solid rgba(0,0,0,0.04)" },
+  listLabel:       { flex:1, fontSize:14, color:"#1C1C1E" },
+  rowDelBtn:       { background:"none", border:"none", color:"#C7C7CC", fontSize:14, cursor:"pointer", padding:"0 4px" },
+  cancelSmall:     { flex:1, padding:"9px 0", background:"var(--bg2)", border:brd, borderRadius:10, color:"#8E8E93", cursor:"pointer", fontFamily:"inherit", fontSize:13, fontWeight:500 },
+  confirmSmall:    { flex:1, padding:"9px 0", background:"var(--accent-grad)", border:"none", borderRadius:10, color:"#fff", cursor:"pointer", fontFamily:"inherit", fontSize:13, fontWeight:600 },
+  linenAddBox:     { background:"var(--bg2)", border:brd, borderRadius:12, padding:14, marginBottom:14 },
+  linenEditRow:    { display:"flex", alignItems:"center", padding:"9px 12px", borderBottom:"1px solid rgba(0,0,0,0.04)" },
+  arrowBtn:        { background:"none", border:"none", color:"#C7C7CC", fontSize:11, cursor:"pointer", padding:"1px 3px", lineHeight:1, display:"block" },
   editBtn:         { background:"none", border:"none", fontSize:14, cursor:"pointer", padding:"0 2px" },
-  editSaveBtn:     { background:"#1a3020", border:"1px solid #2a5030", color:"#5cd87a", borderRadius:6, fontSize:13, cursor:"pointer", padding:"2px 8px", fontFamily:"inherit" },
-  iconPickerBtn:   { display:"flex", alignItems:"center", gap:8, background:"var(--bg3)", border:"1px solid #3a3f55", borderRadius:8, padding:"8px 14px", cursor:"pointer", fontFamily:"inherit" },
-  iconGrid:        { display:"flex", flexWrap:"wrap", gap:6, background:"var(--bg)", border:"1px solid #252a38", borderRadius:10, padding:10, marginTop:6 },
-  iconBtn:         { width:36, height:36, background:"var(--bg3)", border:"1px solid #2a2f3e", borderRadius:8, fontSize:18, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" },
-  iconBtnActive:   { background:"#2a2516", border:"1px solid var(--accent)" },
-  modal:           { position:"fixed", inset:0, background:"rgba(0,0,0,0.75)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:100, padding:24 },
-  modalBox:        { background:"var(--bg3)", borderRadius:16, padding:24, border:"1px solid #2a2f3e", width:"100%", maxWidth:300 },
-  modalCancel:     { flex:1, padding:12, borderRadius:10, background:"var(--bg)", border:"1px solid #2a2f3e", color:"#888", cursor:"pointer", fontFamily:"inherit", fontSize:14 },
-  modalDelete:     { flex:1, padding:12, borderRadius:10, background:"#3a1515", border:"1px solid #5a2020", color:"#e06060", cursor:"pointer", fontFamily:"inherit", fontSize:14, fontWeight:"bold" },
+  editSaveBtn:     { background:"#E8F9ED", border:"none", color:"#34C759", borderRadius:8, fontSize:13, cursor:"pointer", padding:"3px 10px", fontFamily:"inherit", fontWeight:600 },
+  iconPickerBtn:   { display:"flex", alignItems:"center", gap:8, background:"var(--bg2)", border:brd, borderRadius:10, padding:"8px 14px", cursor:"pointer", fontFamily:"inherit" },
+  iconGrid:        { display:"flex", flexWrap:"wrap", gap:6, background:"var(--bg)", border:brd, borderRadius:12, padding:10, marginTop:6 },
+  iconBtn:         { width:36, height:36, background:"var(--bg2)", border:brd, borderRadius:10, fontSize:18, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" },
+  iconBtnActive:   { background:"var(--accent-dim)", border:"1px solid var(--accent)" },
+  modal:           { position:"fixed", inset:0, background:"rgba(0,0,0,0.4)", backdropFilter:"blur(8px)", WebkitBackdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:100, padding:24 },
+  modalBox:        { background:"var(--bg2)", borderRadius:16, padding:24, border:brd, width:"100%", maxWidth:300, boxShadow:"0 10px 40px rgba(0,0,0,0.12)" },
+  modalCancel:     { flex:1, padding:12, borderRadius:12, background:"var(--bg)", border:brd, color:"#8E8E93", cursor:"pointer", fontFamily:"inherit", fontSize:14, fontWeight:500 },
+  modalDelete:     { flex:1, padding:12, borderRadius:12, background:"#FFE5E5", border:"none", color:"#FF3B30", cursor:"pointer", fontFamily:"inherit", fontSize:14, fontWeight:600 },
 };
