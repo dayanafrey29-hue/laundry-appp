@@ -772,48 +772,45 @@ function TaskTab({ apts, linen }) {
 
   if (printMode) {
     return (
-      <div className="print-sheet" style={{ padding:20, fontFamily:"'Inter',sans-serif", color:"#1C1C1E" }}>
+      <div className="print-sheet" style={{ padding:10, fontFamily:"'Inter',sans-serif", color:"#1C1C1E" }}>
         <style>{`
           @media print {
             body > div > div { box-shadow:none!important; border-radius:0!important; margin:0!important; max-width:100%!important; }
             .no-print { display:none!important; }
             .print-sheet { padding:0!important; }
+            @page { margin: 8mm; size: A4; }
           }
         `}</style>
-        <div style={{ textAlign:"center", marginBottom:20 }}>
-          <div style={{ fontSize:20, fontWeight:700 }}>📋 Задание — {fmtDate(today())}</div>
+        <div style={{ textAlign:"center", marginBottom:12, borderBottom:"2px solid #333", paddingBottom:8 }}>
+          <div style={{ fontSize:16, fontWeight:700 }}>📋 Задание на {fmtDate(today())}</div>
         </div>
-        {selectedApts.map(apt => {
-          const data = selected[apt];
-          const linenEntries = Object.entries(data.linen || {}).filter(([, v]) => parseInt(v) > 0);
-          const hasContent = linenEntries.length > 0 || data.consumables?.trim();
-          if (!hasContent) return null;
-          return (
-            <div key={apt} style={{ marginBottom:16, border:"1px solid #ddd", borderRadius:10, overflow:"hidden" }}>
-              <div style={{ background:"#F0F0F5", padding:"8px 14px", fontWeight:700, fontSize:15 }}>🏠 {apt}</div>
-              <div style={{ padding:"10px 14px" }}>
-                {linenEntries.length > 0 && (
-                  <table style={{ width:"100%", borderCollapse:"collapse", marginBottom: data.consumables?.trim() ? 8 : 0 }}>
-                    <tbody>
-                      {linenEntries.map(([id, qty]) => {
-                        const item = linen.find(l => l.id === id);
-                        return (
-                          <tr key={id} style={{ borderBottom:"1px solid #eee" }}>
-                            <td style={{ padding:"4px 0", fontSize:13 }}>{item ? `${item.icon} ${item.label}` : id}</td>
-                            <td style={{ padding:"4px 0", fontSize:13, fontWeight:600, textAlign:"right", width:50 }}>{qty}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                )}
-                {data.consumables?.trim() && (
-                  <div style={{ fontSize:12, color:"#B8860B", marginTop:4 }}>🔔 {data.consumables}</div>
-                )}
+        <div style={{ display:"grid", gridTemplateColumns: selectedApts.length > 3 ? "1fr 1fr" : "1fr", gap:8 }}>
+          {selectedApts.map(apt => {
+            const data = selected[apt];
+            const linenEntries = Object.entries(data.linen || {}).filter(([, v]) => parseInt(v) > 0);
+            const hasContent = linenEntries.length > 0 || data.consumables?.trim();
+            if (!hasContent) return null;
+            return (
+              <div key={apt} style={{ border:"1px solid #ccc", borderRadius:6, overflow:"hidden", breakInside:"avoid" }}>
+                <div style={{ background:"#eee", padding:"4px 10px", fontWeight:700, fontSize:12 }}>🏠 {apt}</div>
+                <div style={{ padding:"4px 10px" }}>
+                  {linenEntries.map(([id, qty]) => {
+                    const item = linen.find(l => l.id === id);
+                    return (
+                      <div key={id} style={{ display:"flex", justifyContent:"space-between", fontSize:11, padding:"2px 0", borderBottom:"1px solid #f0f0f0" }}>
+                        <span>{item ? `${item.icon} ${item.label}` : id}</span>
+                        <span style={{ fontWeight:600 }}>{qty}</span>
+                      </div>
+                    );
+                  })}
+                  {data.consumables?.trim() && (
+                    <div style={{ fontSize:10, color:"#B8860B", marginTop:3, paddingTop:2, borderTop:"1px dashed #ddd" }}>🔔 {data.consumables}</div>
+                  )}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     );
   }
