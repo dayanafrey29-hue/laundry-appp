@@ -106,6 +106,7 @@ export default function App() {
   const [theme, setTheme]     = useState("blue");
   const [bgTheme, setBgTheme] = useState("snow");
   const [pendingCount, setPendingCount] = useState(0);
+  const [bgImage, setBgImage] = useState(() => localStorage.getItem("tca_bg_image") || "");
 
   function getPending() {
     try { return JSON.parse(localStorage.getItem("tca_pending") || "[]"); }
@@ -262,6 +263,7 @@ export default function App() {
   function saveLinen(list)  { setLinen(list); syncKey("linen", list); }
   function saveTheme(id)    { setTheme(id);   applyTheme(id); syncKey("theme", id); }
   function saveBgTheme(id)  { setBgTheme(id); applyBg(id);   syncKey("bg",    id); }
+  function saveBgImage(dataUrl) { setBgImage(dataUrl); if (dataUrl) localStorage.setItem("tca_bg_image", dataUrl); else localStorage.removeItem("tca_bg_image"); }
 
   if (!apts || !maids || !linen) return (
     <div style={s.shell}><div style={{...s.root,display:"flex",alignItems:"center",justifyContent:"center",color:"#8E8E93"}}>Загрузка…</div></div>
@@ -269,6 +271,8 @@ export default function App() {
 
   return (
     <div style={s.shell}>
+      {bgImage && <div style={{position:"fixed",inset:0,zIndex:0,backgroundImage:`url(${bgImage})`,backgroundSize:"cover",backgroundPosition:"center",filter:"blur(28px) brightness(0.92) saturate(0.7)",transform:"scale(1.15)",pointerEvents:"none"}}/>}
+      {bgImage && <div style={{position:"fixed",inset:0,zIndex:0,background:"rgba(255,255,255,0.45)",pointerEvents:"none"}}/>}
       <style>{`
         @media(min-width:600px){
           .tca-root{max-width:540px!important;border-radius:18px!important;margin-top:24px!important;margin-bottom:24px!important;box-shadow:0 4px 30px rgba(0,0,0,0.08)!important;overflow:hidden!important}
@@ -305,7 +309,7 @@ export default function App() {
         {tab==="history" && <HistoryTab records={records} deleteRecord={deleteRecord} linen={linen} maids={maids}/>}
         {tab==="settings" && (
           settingsUnlocked
-            ? <SettingsTab apts={apts} saveApts={saveApts} maids={maids} saveMaids={saveMaids} linen={linen} saveLinen={saveLinen} theme={theme} saveTheme={saveTheme} bgTheme={bgTheme} saveBgTheme={saveBgTheme} onLock={()=>setSettingsUnlocked(false)}/>
+            ? <SettingsTab apts={apts} saveApts={saveApts} maids={maids} saveMaids={saveMaids} linen={linen} saveLinen={saveLinen} theme={theme} saveTheme={saveTheme} bgTheme={bgTheme} saveBgTheme={saveBgTheme} bgImage={bgImage} saveBgImage={saveBgImage} onLock={()=>setSettingsUnlocked(false)}/>
             : <PasswordGate onUnlock={()=>setSettingsUnlocked(true)}/>
         )}
       </div>
@@ -695,7 +699,7 @@ function PhotoLightbox({ src, onClose }) {
 }
 
 // ─── SETTINGS TAB ────────────────────────────────────────────────
-function SettingsTab({ apts, saveApts, maids, saveMaids, linen, saveLinen, theme, saveTheme, bgTheme, saveBgTheme, onLock }) {
+function SettingsTab({ apts, saveApts, maids, saveMaids, linen, saveLinen, theme, saveTheme, bgTheme, saveBgTheme, bgImage, saveBgImage, onLock }) {
   const [section,    setSection]    = useState("apts");
   const [showThemes, setShowThemes] = useState(false);
   const [draftApts,  setDraftApts]  = useState(() => apts);
@@ -764,6 +768,41 @@ function SettingsTab({ apts, saveApts, maids, saveMaids, linen, saveLinen, theme
             </button>
           ))}
         </div>
+
+        <div style={s.sL}>🖼 Фото на фоне</div>
+        <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+          <label style={{display:"inline-flex",alignItems:"center",gap:8,padding:"10px 16px",background:"var(--accent-dim)",border:`1.5px solid var(--accent)`,borderRadius:12,cursor:"pointer",fontSize:13,fontWeight:500,color:"var(--accent-dark)",fontFamily:"inherit"}}>
+            📷 {bgImage ? "Заменить" : "Выбрать фото"}
+            <input type="file" accept="image/*" style={{display:"none"}} onChange={e=>{
+              const file=e.target.files?.[0]; if(!file)return;
+              const reader=new FileReader();
+              reader.onload=()=>{
+                const img=new Image();
+                img.onload=()=>{
+                  const c=document.createElement("canvas");
+                  const max=800; let w=img.width,h=img.height;
+                  if(w>max||h>max){const r=Math.min(max/w,max/h);w*=r;h*=r;}
+                  c.width=w;c.height=h;
+                  c.getContext("2d").drawImage(img,0,0,w,h);
+                  saveBgImage(c.toDataURL("image/jpeg",0.6));
+                };
+                img.src=reader.result;
+              };
+              reader.readAsDataURL(file);
+              e.target.value="";
+            }}/>
+          </label>
+          {bgImage && (
+            <button onClick={()=>saveBgImage("")} style={{padding:"10px 16px",background:"var(--bg2)",border:brd,borderRadius:12,cursor:"pointer",fontSize:13,fontWeight:500,color:"#FF3B30",fontFamily:"inherit"}}>
+              ✕ Убрать
+            </button>
+          )}
+        </div>
+        {bgImage && (
+          <div style={{marginTop:10,borderRadius:12,overflow:"hidden",border:brd,height:80}}>
+            <img src={bgImage} alt="" style={{width:"100%",height:"100%",objectFit:"cover",filter:"blur(8px) brightness(0.95)",transform:"scale(1.1)"}}/>
+          </div>
+        )}
       </div>
     );
   }
@@ -1005,8 +1044,8 @@ function Modal({ text, onCancel, onConfirm }) {
 // ─── STYLES ──────────────────────────────────────────────────────
 const brd = "1px solid rgba(0,0,0,0.06)";
 const s = {
-  shell:           { minHeight:"100vh", background:"var(--bg3)", display:"flex", justifyContent:"center" },
-  root:            { minHeight:"100vh", background:"var(--bg)", color:"#1C1C1E", fontFamily:"'Inter','SF Pro Display',-apple-system,BlinkMacSystemFont,sans-serif", width:"100%", maxWidth:480, paddingBottom:70 },
+  shell:           { minHeight:"100vh", background:"var(--bg3)", display:"flex", justifyContent:"center", position:"relative" },
+  root:            { minHeight:"100vh", background:"var(--bg)", color:"#1C1C1E", fontFamily:"'Inter','SF Pro Display',-apple-system,BlinkMacSystemFont,sans-serif", width:"100%", maxWidth:480, paddingBottom:70, position:"relative", zIndex:1 },
   header:          { display:"flex", alignItems:"center", gap:12, padding:"18px 20px 14px", background:"var(--bg2)", borderBottom:brd, position:"sticky", top:0, zIndex:10, backdropFilter:"blur(12px)", WebkitBackdropFilter:"blur(12px)" },
   headerTitle:     { fontSize:22, fontWeight:700, letterSpacing:-0.3, color:"#1C1C1E" },
   headerSub:       { fontSize:11, color:"#8E8E93", letterSpacing:0.6, textTransform:"uppercase", fontWeight:500 },
