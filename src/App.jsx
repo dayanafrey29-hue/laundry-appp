@@ -102,6 +102,7 @@ export default function App() {
   const [linen, setLinen]     = useState(null);
   const [settingsUnlocked, setSettingsUnlocked] = useState(false);
   const [orderUnlocked, setOrderUnlocked] = useState(false);
+  const [printPortal, setPrintPortal] = useState(null);
   const [syncBanner, setSyncBanner] = useState(false);
   const [online, setOnline]   = useState(navigator.onLine);
   const [theme, setTheme]     = useState("blue");
@@ -335,9 +336,10 @@ export default function App() {
         {tab==="history" && <HistoryTab records={records} deleteRecord={deleteRecord} updateRecord={updateRecord} linen={linen} maids={maids} apts={apts}/>}
         {tab==="task" && (
           orderUnlocked
-            ? <TaskTab apts={apts} linen={linen}/>
+            ? <TaskTab apts={apts} linen={linen} renderPrintInPortal={node => setPrintPortal(node)}/>
             : <PasswordGate onUnlock={()=>setOrderUnlocked(true)} title="Order" subtitle="Введите пароль для доступа"/>
         )}
+        {printPortal}
         {tab==="settings" && (
           settingsUnlocked
             ? <SettingsTab apts={apts} saveApts={saveApts} maids={maids} saveMaids={saveMaids} linen={linen} saveLinen={saveLinen} theme={theme} saveTheme={saveTheme} bgTheme={bgTheme} saveBgTheme={saveBgTheme} bgImage={bgImage} saveBgImage={saveBgImage} onLock={()=>setSettingsUnlocked(false)}/>
@@ -740,12 +742,11 @@ function HistoryTab({ records, deleteRecord, updateRecord, linen, maids, apts })
 }
 
 // ─── TASK TAB (SUPERVISOR) ────────────────────────────────────────
-function TaskTab({ apts, linen }) {
+function TaskTab({ apts, linen, renderPrintInPortal }) {
   const [orders, setOrders] = useState([]);
   const [editingApt, setEditingApt] = useState(null);
   const [editData, setEditData] = useState({ linen: {}, consumables: "" });
   const [aptSearch, setAptSearch] = useState("");
-  const [printMode, setPrintMode] = useState(false);
 
   const filteredApts = apts.filter(a => a.toLowerCase().includes(aptSearch.toLowerCase()));
   const orderApts = orders.map(o => o.apt);
@@ -781,40 +782,32 @@ function TaskTab({ apts, linen }) {
   }
 
   function handlePrint() {
-    setPrintMode(true);
-    setTimeout(() => { window.print(); setPrintMode(false); }, 300);
-  }
-
-  if (printMode) {
-    return (
-      <div className="print-sheet" style={{ padding:10, fontFamily:"'Inter',sans-serif", color:"#1C1C1E" }}>
-        <style>{`
-          @media print {
-            body > div > div { box-shadow:none!important; border-radius:0!important; margin:0!important; max-width:100%!important; }
-            .no-print { display:none!important; }
-            .print-sheet { padding:0!important; }
-            @page { margin: 8mm; size: A4; }
-          }
-        `}</style>
-        <div style={{ textAlign:"center", marginBottom:10, borderBottom:"2px solid #333", paddingBottom:6 }}>
+    const printContent = (
+      <div className="print-sheet" style={{ padding:10, fontFamily:"'Inter',sans-serif", color:"#000" }}>
+        <div style={{ textAlign:"center", marginBottom:12, borderBottom:"2px solid #000", paddingBottom:6 }}>
           <div style={{ fontSize:14, fontWeight:700 }}>Задание на {fmtDate(today())}</div>
         </div>
         {orders.map(({ apt, linen: ln, consumables }) => {
           const items = Object.entries(ln).filter(([, v]) => parseInt(v) > 0);
-          if (items.length === 0 && !consumables?.trim()) return null;
-          const parts = items.map(([id, qty]) => {
-            const item = linen.find(l => l.id === id);
-            return `${item ? item.label : id} ×${qty}`;
-          });
-          if (consumables?.trim()) parts.push(consumables.trim());
+          const consParts = consumables?.trim() ? consumables.trim().split(/[,;]+/).map(c => c.trim()).filter(Boolean) : [];
+          if (items.length === 0 && consParts.length === 0) return null;
           return (
-            <div key={apt} style={{ fontSize:12, padding:"4px 0", borderBottom:"1px solid #ddd" }}>
-              <strong>{apt}:</strong> {parts.join(", ")}
+            <div key={apt} style={{ marginBottom:10 }}>
+              <div style={{ fontSize:13, fontWeight:700 }}>{apt}:</div>
+              {items.map(([id, qty]) => {
+                const item = linen.find(l => l.id === id);
+                return <div key={id} style={{ fontSize:12, paddingLeft:12 }}>— {item ? item.label : id} {qty}</div>;
+              })}
+              {consParts.map((c, i) => (
+                <div key={i} style={{ fontSize:12, paddingLeft:12 }}>— {c}</div>
+              ))}
             </div>
           );
         })}
       </div>
     );
+    renderPrintInPortal(printContent);
+    setTimeout(() => { window.print(); renderPrintInPortal(null); }, 300);
   }
 
   if (editingApt) {
