@@ -837,9 +837,22 @@ function TaskTab({ apts, linen, syncKey }) {
     return html;
   }
 
+  function handleSave() {
+    saveToHistory();
+    setOrders([]);
+    setOrderDate(today());
+  }
+
   function handlePrint() {
     saveToHistory();
     doPrint(buildPrintHtml(orderDate, orders));
+  }
+
+  function loadFromHistory(entry) {
+    setOrders(entry.items);
+    setOrderDate(entry.date);
+    setHistoryDetail(null);
+    setShowHistory(false);
   }
 
   function reprintFromHistory(entry) {
@@ -868,8 +881,9 @@ function TaskTab({ apts, linen, syncKey }) {
           );
         })}
         <div style={{ display:"flex", gap:8, marginTop:12 }}>
+          <button onClick={() => loadFromHistory(e)} style={{ ...s.saveBtn, flex:1, marginTop:0, background:"var(--accent-dark)" }}>✏️ Изменить</button>
           <button onClick={() => reprintFromHistory(e)} style={{ ...s.saveBtn, flex:1, marginTop:0 }}>🖨️ Печать</button>
-          <button onClick={() => { deleteHistoryEntry(e.id); }} style={{ ...s.saveBtn, flex:1, marginTop:0, background:"#FF3B30" }}>🗑 Удалить</button>
+          <button onClick={() => { deleteHistoryEntry(e.id); }} style={{ ...s.saveBtn, flex:1, marginTop:0, background:"#FF3B30" }}>🗑</button>
         </div>
       </div>
     );
@@ -986,9 +1000,14 @@ function TaskTab({ apts, linen, syncKey }) {
           );
         })}
 
-        <button onClick={handlePrint} style={{ ...s.saveBtn, marginTop:16 }} className="no-print">
-          🖨️ Печать ({orders.length} кв.)
-        </button>
+        <div style={{ display:"flex", gap:8, marginTop:16 }}>
+          <button onClick={handleSave} style={{ ...s.saveBtn, flex:1, marginTop:0, background:"var(--accent-dark)" }}>
+            💾 Сохранить
+          </button>
+          <button onClick={handlePrint} style={{ ...s.saveBtn, flex:1, marginTop:0 }} className="no-print">
+            🖨️ Печать
+          </button>
+        </div>
       </>}
 
       {orders.length === 0 && !aptSearch && (
