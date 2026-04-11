@@ -78,17 +78,14 @@ function compressImage(file, maxPx = 1200, quality = 0.6) {
         const h = Math.round(img.height * scale);
         const canvas = document.createElement("canvas");
         canvas.width = w; canvas.height = h;
-  canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-
-  canvas.toBlob((blob) => {
-    resolve(blob);
-  }, "image/jpeg", 0.6); // Ось тут ми виправили дужки
-  };
-  img.src = e.target.result;
-  };
-  reader.readAsDataURL(file);
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        const preview = canvas.toDataURL("image/jpeg", quality);
+        canvas.toBlob(blob => resolve({ preview, blob }), "image/jpeg", quality);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
   });
-
 }
 
 // ─── ROOT ────────────────────────────────────────────────────────
@@ -280,6 +277,7 @@ function LogTab({ addRecord, apts, maids, linen }) {
   const [aptSearch, setAptSearch] = useState("");
   const [form, setForm]           = useState({date:today(),apartment:"",maid:"",linen:{},consumables:"",notes:"",photos:[]});
   const [saved, setSaved]         = useState(false);
+  const [saving, setSaving]       = useState(false);
   const photoRef                  = useRef();
 
   useEffect(() => {
@@ -297,72 +295,54 @@ function LogTab({ addRecord, apts, maids, linen }) {
 
   async function handlePhoto(e) {
     const files = Array.from(e.target.files);
-    // Тепер ми просто стискаємо до стану файлу (Blob), а не тексту
-    const compressedFiles = await Promise.all(files.map(f => compressImage(f)));
-
-    setForm(f => ({
-      ...f,
-      photos: [...f.photos, ...compressedFiles] // Тут тепер лежатимуть справжні файли
-    }));
+    const compressed = await Promise.all(files.map(f => compressImage(f)));
+    setForm(f => ({ ...f, photos: [...f.photos, ...compressed] }));
     e.target.value = "";
   }
-
 
   const handleSaveRecord = async () => {
     if (!form.apartment || !form.maid) {
       alert("Выберите квартиру и сотрудника!");
       return;
     }
-
+    setSaving(true);
     try {
-      // 1. Завантаження фото
       const uploadedUrls = [];
-      for (const file of form.photos) {
-        const fileName = `${uid()}.jpg`;
+      for (const photo of form.photos) {
+        const fileName = `${Date.now()}_${uid()}.jpg`;
         const { data, error: uploadError } = await supabase.storage
           .from('laundry')
-          .upload(fileName, file);
-
-        if (!uploadError) {
-          const { data: urlData } = supabase.storage
-            .from('laundry')
-            .getPublicUrl(fileName);
-          uploadedUrls.push(urlData.publicUrl);
+          .upload(fileName, photo.blob, { contentType: 'image/jpeg' });
+        if (uploadError) {
+          console.error("Помилка завантаження фото:", uploadError.message);
+          continue;
         }
+        const { data: urlData } = supabase.storage
+          .from('laundry')
+          .getPublicUrl(data.path);
+        uploadedUrls.push(urlData.publicUrl);
       }
 
-      // 2. Збереження запису
       await addRecord({
-        apartment: form.apartment,
-        maid: form.maid,
-        date: form.date,
-        linen: form.linen,
+        apartment:   form.apartment,
+        maid:        form.maid,
+        date:        form.date,
+        linen:       form.linen,
         consumables: form.consumables,
-        notes: form.notes,
-        photos: uploadedUrls
+        notes:       form.notes,
+        photos:      uploadedUrls,
       });
 
-      // 3. Успішне завершення
       setSaved(true);
-      setTimeout(() => {
-        setSaved(false);
-      }, 2500);
-
-      // Очищення форми
-      setForm({ 
-        date: today(), 
-        apartment: "", 
-        maid: "", 
-        linen: {}, 
-        consumables: "", 
-        notes: "", 
-        photos: [] 
-      });
+      setTimeout(() => setSaved(false), 2500);
+      setForm({ date: today(), apartment: "", maid: "", linen: {}, consumables: "", notes: "", photos: [] });
       setAptSearch("");
-
+      setStep(1);
     } catch (error) {
-      console.error("Помилка:", error);
-      alert("Виникла помилка при збереженні!");
+      console.error("Помилка збереження:", error);
+      alert("Ошибка сохранения: " + error.message);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -431,14 +411,9 @@ function LogTab({ addRecord, apts, maids, linen }) {
 
         <div style={s.sL}>Фото (необязательно)</div>
         <div style={s.photoRow}>
-          {form.photos.map((src,i)=>(
+          {form.photos.map((photo,i)=>(
             <div key={i} style={s.thumbWrap}>
-              <img 
-                src={src instanceof File || src instanceof Blob ? URL.createObjectURL(src) : src} 
-                alt="" 
-                style={s.thumb} 
-              />
-
+              <img src={photo.preview} alt="" style={s.thumb}/>
               <button onClick={()=>setForm(f=>({...f,photos:f.photos.filter((_,idx)=>idx!==i)}))} style={s.thumbDel}>✕</button>
             </div>
           ))}
@@ -458,11 +433,11 @@ function LogTab({ addRecord, apts, maids, linen }) {
           placeholder="Пятно, повреждение, особые замечания…"
           rows={2} style={{...s.input,resize:"none",lineHeight:1.6}}/>
 
-        <button 
-          onClick={handleSaveRecord} 
-          style={s.saveBtn}
-        >
-          💾 Сохранить запись
+        <button
+          onClick={handleSaveRecord}
+          disabled={saving}
+          style={{...s.saveBtn, ...(saving ? s.saveBtnOff : {})}}>
+          {saving ? "⏳ Сохранение…" : "💾 Сохранить запись"}
         </button>
       </>}
     </div>
