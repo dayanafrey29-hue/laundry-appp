@@ -336,7 +336,7 @@ export default function App() {
         {tab==="history" && <HistoryTab records={records} deleteRecord={deleteRecord} updateRecord={updateRecord} linen={linen} maids={maids} apts={apts}/>}
         {tab==="task" && (
           orderUnlocked
-            ? <TaskTab apts={apts} linen={linen} renderPrintInPortal={node => setPrintPortal(node)}/>
+            ? <TaskTab apts={apts} linen={linen} renderPrintInPortal={node => setPrintPortal(node)} syncKey={syncKey}/>
             : <PasswordGate onUnlock={()=>setOrderUnlocked(true)} title="Order" subtitle="Введите пароль для доступа"/>
         )}
         {printPortal}
@@ -742,11 +742,20 @@ function HistoryTab({ records, deleteRecord, updateRecord, linen, maids, apts })
 }
 
 // ─── TASK TAB (SUPERVISOR) ────────────────────────────────────────
-function TaskTab({ apts, linen, renderPrintInPortal }) {
+function TaskTab({ apts, linen, renderPrintInPortal, syncKey }) {
   const [orders, setOrders] = useState([]);
+  const [orderDate, setOrderDate] = useState(today());
   const [editingApt, setEditingApt] = useState(null);
   const [editData, setEditData] = useState({ linen: {}, consumables: "" });
   const [aptSearch, setAptSearch] = useState("");
+  const [history, setHistory] = useState([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyDetail, setHistoryDetail] = useState(null);
+
+  useEffect(() => {
+    supabase.from('laundry_store').select('*').eq('key', 'order_history').single()
+      .then(({ data }) => { if (data?.value) setHistory(data.value); });
+  }, []);
 
   const filteredApts = apts.filter(a => a.toLowerCase().includes(aptSearch.toLowerCase()));
   const orderApts = orders.map(o => o.apt);
@@ -781,11 +790,26 @@ function TaskTab({ apts, linen, renderPrintInPortal }) {
     setOrders(prev => prev.filter(o => o.apt !== apt));
   }
 
+  function saveToHistory() {
+    const entry = { id: uid(), date: orderDate, items: orders, createdAt: new Date().toISOString() };
+    const updated = [entry, ...history].slice(0, 50);
+    setHistory(updated);
+    syncKey('order_history', updated);
+  }
+
+  function deleteHistoryEntry(id) {
+    const updated = history.filter(h => h.id !== id);
+    setHistory(updated);
+    syncKey('order_history', updated);
+    if (historyDetail?.id === id) setHistoryDetail(null);
+  }
+
   function handlePrint() {
+    saveToHistory();
     const printContent = (
       <div className="print-sheet" style={{ padding:10, fontFamily:"'Inter',sans-serif", color:"#000" }}>
         <div style={{ textAlign:"center", marginBottom:12, borderBottom:"2px solid #000", paddingBottom:6 }}>
-          <div style={{ fontSize:14, fontWeight:700 }}>Задание на {fmtDate(today())}</div>
+          <div style={{ fontSize:14, fontWeight:700 }}>Задание на {fmtDate(orderDate)}</div>
         </div>
         {orders.map(({ apt, linen: ln, consumables }) => {
           const items = Object.entries(ln).filter(([, v]) => parseInt(v) > 0);
@@ -808,6 +832,95 @@ function TaskTab({ apts, linen, renderPrintInPortal }) {
     );
     renderPrintInPortal(printContent);
     setTimeout(() => { window.print(); renderPrintInPortal(null); }, 300);
+  }
+
+  function reprintFromHistory(entry) {
+    const printContent = (
+      <div className="print-sheet" style={{ padding:10, fontFamily:"'Inter',sans-serif", color:"#000" }}>
+        <div style={{ textAlign:"center", marginBottom:12, borderBottom:"2px solid #000", paddingBottom:6 }}>
+          <div style={{ fontSize:14, fontWeight:700 }}>Задание на {fmtDate(entry.date)}</div>
+        </div>
+        {entry.items.map(({ apt, linen: ln, consumables }) => {
+          const items = Object.entries(ln).filter(([, v]) => parseInt(v) > 0);
+          const consParts = consumables?.trim() ? consumables.trim().split(/[,;]+/).map(c => c.trim()).filter(Boolean) : [];
+          if (items.length === 0 && consParts.length === 0) return null;
+          return (
+            <div key={apt} style={{ marginBottom:10 }}>
+              <div style={{ fontSize:13, fontWeight:700 }}>{apt}:</div>
+              {items.map(([id, qty]) => {
+                const item = linen.find(l => l.id === id);
+                return <div key={id} style={{ fontSize:12, paddingLeft:12 }}>— {item ? item.label : id} {qty}</div>;
+              })}
+              {consParts.map((c, i) => (
+                <div key={i} style={{ fontSize:12, paddingLeft:12 }}>— {c}</div>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+    );
+    renderPrintInPortal(printContent);
+    setTimeout(() => { window.print(); renderPrintInPortal(null); }, 300);
+  }
+
+  if (historyDetail) {
+    const e = historyDetail;
+    return (
+      <div style={s.page}>
+        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}>
+          <button onClick={() => setHistoryDetail(null)} style={{ background:"none", border:"none", fontSize:20, cursor:"pointer", color:"var(--accent)", padding:0 }}>←</button>
+          <div style={{ fontSize:16, fontWeight:700 }}>📋 {fmtDate(e.date)}</div>
+        </div>
+        {e.items.map(({ apt, linen: ln, consumables }) => {
+          const items = Object.entries(ln).filter(([, v]) => parseInt(v) > 0);
+          return (
+            <div key={apt} style={{ ...s.card, marginBottom:8, padding:"10px 14px" }}>
+              <div style={{ fontWeight:600, fontSize:14, marginBottom:4 }}>🏠 {apt}</div>
+              {items.map(([id, qty]) => {
+                const item = linen.find(l => l.id === id);
+                return <div key={id} style={{ fontSize:12, color:"#555", paddingLeft:8 }}>— {item ? `${item.icon} ${item.label}` : id} {qty}</div>;
+              })}
+              {consumables?.trim() && <div style={{ fontSize:11, color:"#B8860B", marginTop:4, paddingLeft:8 }}>🔔 {consumables}</div>}
+            </div>
+          );
+        })}
+        <div style={{ display:"flex", gap:8, marginTop:12 }}>
+          <button onClick={() => reprintFromHistory(e)} style={{ ...s.saveBtn, flex:1, marginTop:0 }}>🖨️ Печать</button>
+          <button onClick={() => { deleteHistoryEntry(e.id); }} style={{ ...s.saveBtn, flex:1, marginTop:0, background:"#FF3B30" }}>🗑 Удалить</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (showHistory) {
+    return (
+      <div style={s.page}>
+        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}>
+          <button onClick={() => setShowHistory(false)} style={{ background:"none", border:"none", fontSize:20, cursor:"pointer", color:"var(--accent)", padding:0 }}>←</button>
+          <div style={{ fontSize:16, fontWeight:700 }}>История заказов</div>
+        </div>
+        {history.length === 0 && (
+          <div style={s.empty}>
+            <div style={{ fontSize:44, marginBottom:12 }}>📭</div>
+            <p style={{ margin:0, color:"#555" }}>Пока нет заказов</p>
+          </div>
+        )}
+        {history.map(entry => (
+          <div key={entry.id} onClick={() => setHistoryDetail(entry)}
+            style={{ ...s.card, marginBottom:8, padding:"12px 14px", cursor:"pointer" }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <div>
+                <div style={{ fontWeight:600, fontSize:14 }}>📋 {fmtDate(entry.date)}</div>
+                <div style={{ fontSize:11, color:"#8E8E93", marginTop:2 }}>
+                  {entry.items.length} кв. · {entry.items.map(i => i.apt).join(", ")}
+                </div>
+              </div>
+              <span style={{ color:"#C7C7CC", fontSize:16 }}>›</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
   }
 
   if (editingApt) {
@@ -846,7 +959,16 @@ function TaskTab({ apts, linen, renderPrintInPortal }) {
 
   return (
     <div style={s.page}>
-      <div style={s.sL}>Добавить квартиру</div>
+      <div style={s.sL}>Дата заказа</div>
+      <input type="date" value={orderDate} onChange={e => setOrderDate(e.target.value)}
+        style={{ ...s.input, marginBottom:14, fontSize:14 }}/>
+
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+        <div style={s.sL}>Добавить квартиру</div>
+        <button onClick={() => setShowHistory(true)} style={{ background:"none", border:"none", color:"var(--accent)", fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:"inherit", padding:"0 0 4px" }}>
+          📜 История ({history.length})
+        </button>
+      </div>
       <input value={aptSearch} onChange={e => setAptSearch(e.target.value)}
         placeholder="🔍 Поиск квартиры..."
         style={{ ...s.input, marginBottom:10 }}/>
@@ -886,7 +1008,7 @@ function TaskTab({ apts, linen, renderPrintInPortal }) {
         </button>
       </>}
 
-      {orders.length === 0 && (
+      {orders.length === 0 && !aptSearch && (
         <div style={s.empty}>
           <div style={{ fontSize:44, marginBottom:12 }}>📋</div>
           <p style={{ margin:0, color:"#555" }}>Выберите квартиры и заполните задание</p>
