@@ -60,34 +60,48 @@ export default function App() {
   const [syncBanner, setSyncBanner] = useState(false);
   const [online, setOnline]   = useState(true);
 
-  // ЗАВАНТАЖЕННЯ ДАНИХ З SUPABASE ПРИ ЗАПУСКУ
+  // ЗАВАНТАЖЕННЯ ЗАПИСІВ З SUPABASE
   useEffect(() => {
-    const fetchHistory = async () => {
-      const { data, error } = await supabase
-        .from('laundry_records')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (!error && data) {
-        setRecords(data);
-      }
-    };
-    fetchHistory();
+    supabase
+      .from('laundry_records')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .then(({ data, error }) => {
+        if (!error && data) setRecords(data);
+      });
   }, []);
 
+  // ЗАВАНТАЖЕННЯ НАЛАШТУВАНЬ З SUPABASE (з fallback на дефолти)
+  useEffect(() => {
+    supabase
+      .from('laundry_store')
+      .select('*')
+      .then(({ data, error }) => {
+        const map = (!error && data)
+          ? Object.fromEntries(data.map(r => [r.key, r.value]))
+          : {};
+        const a = map['apts']  || DEFAULT_APTS;
+        const m = map['maids'] || DEFAULT_MAIDS;
+        const l = map['linen'] || DEFAULT_LINEN;
+        setApts(a);
+        setMaids(m);
+        setLinen(l);
+        if (!map['apts'])  syncKey('apts',  a);
+        if (!map['maids']) syncKey('maids', m);
+        if (!map['linen']) syncKey('linen', l);
+      });
+  }, []);
 
   function showSync() {
     setSyncBanner(true);
     setTimeout(() => setSyncBanner(false), 2500);
   }
 
-  // ФУНКЦІЇ СИНХРОНІЗАЦІЇ З SUPABASE
-  async function syncWithDB(key, value) {
+  async function syncKey(key, value) {
     try {
       const { error } = await supabase
         .from('laundry_store')
-        .upsert({ key: key, value: value });
-
+        .upsert({ key, value });
       if (error) throw error;
       showSync();
     } catch (err) {
@@ -96,10 +110,27 @@ export default function App() {
     }
   }
 
-  function saveRecords(list) { setRecords(list); syncWithDB("records", list); }
-  function saveApts(list)    { const sorted = [...list].sort((a,b)=>a.localeCompare(b,"ru",{numeric:true})); setApts(sorted); syncWithDB("apts", sorted); }
-  function saveMaids(list)   { setMaids(list); syncWithDB("maids", list); }
-  function saveLinen(list)   { setLinen(list); syncWithDB("linen", list); }
+  async function addRecord(record) {
+    const { data, error } = await supabase
+      .from('laundry_records')
+      .insert([record])
+      .select();
+    if (error) throw error;
+    if (data) setRecords(prev => [data[0], ...prev]);
+    showSync();
+  }
+
+  async function deleteRecord(id) {
+    const { error } = await supabase
+      .from('laundry_records')
+      .delete()
+      .eq('id', id);
+    if (!error) setRecords(prev => prev.filter(r => r.id !== id));
+  }
+
+  function saveApts(list)  { const sorted = [...list].sort((a,b)=>a.localeCompare(b,"ru",{numeric:true})); setApts(sorted); syncKey("apts", sorted); }
+  function saveMaids(list) { setMaids(list); syncKey("maids", list); }
+  function saveLinen(list) { setLinen(list); syncKey("linen", list); }
 
   if (!apts || !maids || !linen) return (
     <div style={{...s.root,display:"flex",alignItems:"center",justifyContent:"center",color:"#555"}}>Загрузка…</div>
@@ -127,8 +158,8 @@ export default function App() {
         ))}
       </div>
 
-      {tab==="log"     && <LogTab records={records} saveRecords={saveRecords} apts={apts} maids={maids} linen={linen}/>}
-      {tab==="history" && <HistoryTab records={records} saveRecords={saveRecords} linen={linen}/>}
+      {tab==="log"     && <LogTab addRecord={addRecord} apts={apts} maids={maids} linen={linen}/>}
+      {tab==="history" && <HistoryTab records={records} deleteRecord={deleteRecord} linen={linen}/>}
       {tab==="settings" && (
         settingsUnlocked
           ? <SettingsTab apts={apts} saveApts={saveApts} maids={maids} saveMaids={saveMaids} linen={linen} saveLinen={saveLinen} onLock={()=>setSettingsUnlocked(false)}/>
@@ -192,7 +223,7 @@ function PasswordGate({ onUnlock }) {
 }
 
 // ─── LOG TAB ─────────────────────────────────────────────────────
-function LogTab({ records, saveRecords, apts, maids, linen }) {
+function LogTab({ addRecord, apts, maids, linen }) {
   const [step, setStep]           = useState(1);
   const [aptSearch, setAptSearch] = useState("");
   const [form, setForm]           = useState({date:today(),apartment:"",maid:"",linen:{},consumables:"",notes:"",photos:[]});
@@ -216,33 +247,27 @@ function LogTab({ records, saveRecords, apts, maids, linen }) {
   }
 
   const handleSaveRecord = async () => {
-    // Перевіряємо, чи вибрана квартира та покоївка у твоєму об'єкті form
     if (!form.apartment || !form.maid) {
       alert("Выберите квартиру и сотрудника!");
       return;
     }
-
-    const { error } = await supabase
-      .from('laundry_records')
-      .insert([{
-        apartment_number: form.apartment, // беремо квартиру з форми
-        worker_name: form.maid,           // беремо покоївку з форми
-        items_json: form.counts,          // беремо кількість білизни
-        notes: form.notes || ''            // додаємо нотатки, якщо є
-      }]);
-
-    if (error) {
-      alert("Ошибка: " + error.message);
-    } else {
-      alert("✅ Запись добавлена в журнал!");
-      // Очищаємо форму після збереження
-      setForm({
-        ...form,
-        apartment: '',
-        counts: {},
-        notes: '',
-        photos: []
+    try {
+      await addRecord({
+        apartment:   form.apartment,
+        maid:        form.maid,
+        date:        form.date,
+        linen:       form.linen,
+        consumables: form.consumables,
+        notes:       form.notes,
+        photos:      form.photos,
       });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+      setForm({ date: today(), apartment: "", maid: "", linen: {}, consumables: "", notes: "", photos: [] });
+      setAptSearch("");
+      setStep(1);
+    } catch (err) {
+      alert("Ошибка сохранения: " + err.message);
     }
   };
 
@@ -343,7 +368,7 @@ function LogTab({ records, saveRecords, apts, maids, linen }) {
 }
 
 // ─── HISTORY TAB ─────────────────────────────────────────────────
-function HistoryTab({ records, saveRecords, linen }) {
+function HistoryTab({ records, deleteRecord, linen }) {
   const [search,setSearch]         = useState("");
   const [dateFilter,setDateFilter] = useState("");
   const [expanded,setExpanded]     = useState(null);
@@ -360,8 +385,8 @@ function HistoryTab({ records, saveRecords, linen }) {
 
   const linenTotal = l => Object.values(l||{}).reduce((sum,v)=>sum+(parseInt(v)||0),0);
 
-  function doDelete() {
-    saveRecords(records.filter(r=>r.id!==delId));
+  async function doDelete() {
+    await deleteRecord(delId);
     if (expanded===delId) setExpanded(null);
     setDelId(null);
   }
