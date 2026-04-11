@@ -296,7 +296,7 @@ export default function App() {
         <div style={{display: tab==="log" ? undefined : "none"}}>
           <LogTab addRecord={addRecord} apts={apts} maids={maids} linen={linen}/>
         </div>
-        {tab==="history" && <HistoryTab records={records} deleteRecord={deleteRecord} linen={linen}/>}
+        {tab==="history" && <HistoryTab records={records} deleteRecord={deleteRecord} linen={linen} maids={maids}/>}
         {tab==="settings" && (
           settingsUnlocked
             ? <SettingsTab apts={apts} saveApts={saveApts} maids={maids} saveMaids={saveMaids} linen={linen} saveLinen={saveLinen} theme={theme} saveTheme={saveTheme} bgTheme={bgTheme} saveBgTheme={saveBgTheme} onLock={()=>setSettingsUnlocked(false)}/>
@@ -546,9 +546,10 @@ function LogTab({ addRecord, apts, maids, linen }) {
 }
 
 // ─── HISTORY TAB ─────────────────────────────────────────────────
-function HistoryTab({ records, deleteRecord, linen }) {
+function HistoryTab({ records, deleteRecord, linen, maids }) {
   const [search,setSearch]         = useState("");
   const [dateFilter,setDateFilter] = useState("");
+  const [maidFilter,setMaidFilter] = useState("");
   const [expanded,setExpanded]     = useState(null);
   const [delId,setDelId]           = useState(null);
   const [lightbox,setLightbox]     = useState(null);
@@ -557,7 +558,8 @@ function HistoryTab({ records, deleteRecord, linen }) {
     .filter(r=>{
       const mA = !search     || r.apartment.toLowerCase().includes(search.toLowerCase());
       const mD = !dateFilter || r.date===dateFilter;
-      return mA&&mD;
+      const mM = !maidFilter || r.maid===maidFilter;
+      return mA&&mD&&mM;
     })
     .sort((a,b)=>(b.date||"").localeCompare(a.date||""));
 
@@ -579,10 +581,23 @@ function HistoryTab({ records, deleteRecord, linen }) {
           style={{...s.input,paddingLeft:40}}/>
         <span style={s.sIcon}>🔎</span>
       </div>
-      <input type="date" value={dateFilter} onChange={e=>setDateFilter(e.target.value)}
-        style={{...s.input,marginBottom:0}}/>
-      {(search||dateFilter) &&
-        <button onClick={()=>{setSearch("");setDateFilter("");}} style={s.clearBtn}>✕ Очистить фильтры</button>}
+      <div style={{display:"flex",gap:8,marginBottom:0}}>
+        <div style={{flex:1,position:"relative"}}>
+          <div style={{fontSize:11,color:"#8E8E93",marginBottom:4,fontWeight:600,letterSpacing:0.5}}>ДАТА</div>
+          <input type="date" value={dateFilter} onChange={e=>setDateFilter(e.target.value)}
+            style={s.input}/>
+        </div>
+        <div style={{flex:1}}>
+          <div style={{fontSize:11,color:"#8E8E93",marginBottom:4,fontWeight:600,letterSpacing:0.5}}>ГОРНИЧНАЯ</div>
+          <select value={maidFilter} onChange={e=>setMaidFilter(e.target.value)}
+            style={{...s.input,color:maidFilter?"#1C1C1E":"#8E8E93"}}>
+            <option value="">Все</option>
+            {(maids||[]).map(m=><option key={m} value={m}>{m}</option>)}
+          </select>
+        </div>
+      </div>
+      {(search||dateFilter||maidFilter) &&
+        <button onClick={()=>{setSearch("");setDateFilter("");setMaidFilter("");}} style={s.clearBtn}>✕ Очистить фильтры</button>}
       <p style={s.countLabel}>{filtered.length} запис{filtered.length===1?"ь":"ей"}</p>
 
       {filtered.length===0
