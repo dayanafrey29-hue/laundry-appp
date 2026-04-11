@@ -958,7 +958,7 @@ function TaskTab({ apts, linen, syncKey, records }) {
           if (aptRecords.length === 0) return null;
           return (
             <div style={{ marginTop:20 }}>
-              <div style={s.sL}>Последние записи покоївок</div>
+              <div style={s.sL}>Последние записи горничной</div>
               {aptRecords.map(r => {
                 const linenItems = Object.entries(r.linen || {}).filter(([k, v]) => k !== "_no_linen" && v > 0);
                 const noLinen = r.linen?._no_linen;
@@ -969,9 +969,17 @@ function TaskTab({ apts, linen, syncKey, records }) {
                       <span>📅 {fmtDate(r.date)}</span>
                     </div>
                     {noLinen && <div style={{ fontSize:12, color:"#FF3B30" }}>⚠️ Нет белья</div>}
-                    {linenItems.map(([name, qty]) => (
-                      <div key={name} style={{ fontSize:11, color:"#555" }}>  {name} — {qty}</div>
-                    ))}
+                    {linenItems.map(([name, qty]) => {
+                      // Шукаємо предмет у нашому списку DEFAULT_LINEN за його id
+                      const item = DEFAULT_LINEN.find(i => i.id === name);
+                      return (
+                        <div key={name} style={{ fontSize: 11, color: "#555" }}>
+                          {item ? `${item.icon} ${item.label}` : name} — {qty}
+                        </div>
+                      );
+                    })}
+
+
                     {r.consumables?.trim() && <div style={{ fontSize:11, color:"#B8860B", marginTop:2 }}>🔔 {r.consumables}</div>}
                   </div>
                 );
