@@ -333,11 +333,10 @@ export default function App() {
           <LogTab addRecord={addRecord} apts={apts} maids={maids} linen={linen}/>
         </div>
         {tab==="history" && <HistoryTab records={records} deleteRecord={deleteRecord} updateRecord={updateRecord} linen={linen} maids={maids} apts={apts}/>}
-        {tab==="task" && (
-          orderUnlocked
-            ? <TaskTab apts={apts} linen={linen} syncKey={syncKey}/>
-            : <PasswordGate onUnlock={()=>setOrderUnlocked(true)} title="Order" subtitle="Введите пароль для доступа"/>
-        )}
+        {tab==="task" && !orderUnlocked && <PasswordGate onUnlock={()=>setOrderUnlocked(true)} title="Order" subtitle="Введите пароль для доступа"/>}
+        <div style={{display: tab==="task" && orderUnlocked ? undefined : "none"}}>
+          <TaskTab apts={apts} linen={linen} syncKey={syncKey} records={records}/>
+        </div>
         {tab==="settings" && (
           settingsUnlocked
             ? <SettingsTab apts={apts} saveApts={saveApts} maids={maids} saveMaids={saveMaids} linen={linen} saveLinen={saveLinen} theme={theme} saveTheme={saveTheme} bgTheme={bgTheme} saveBgTheme={saveBgTheme} bgImage={bgImage} saveBgImage={saveBgImage} onLock={()=>setSettingsUnlocked(false)}/>
@@ -785,7 +784,7 @@ function CopyTextBlock({ text }) {
   );
 }
 
-function TaskTab({ apts, linen, syncKey }) {
+function TaskTab({ apts, linen, syncKey, records }) {
   const [orders, setOrders] = useState([]);
   const [orderDate, setOrderDate] = useState(today());
   const [editingApt, setEditingApt] = useState(null);
@@ -950,6 +949,36 @@ function TaskTab({ apts, linen, syncKey }) {
         <button onClick={saveAptOrder} style={{ ...s.saveBtn, marginTop:16 }}>
           ✓ Добавить
         </button>
+
+        {(() => {
+          const aptRecords = (records || [])
+            .filter(r => r.apartment === editingApt)
+            .sort((a, b) => (b.date || "").localeCompare(a.date || ""))
+            .slice(0, 3);
+          if (aptRecords.length === 0) return null;
+          return (
+            <div style={{ marginTop:20 }}>
+              <div style={s.sL}>Последние записи покоївок</div>
+              {aptRecords.map(r => {
+                const linenItems = Object.entries(r.linen || {}).filter(([k, v]) => k !== "_no_linen" && v > 0);
+                const noLinen = r.linen?._no_linen;
+                return (
+                  <div key={r.id} style={{ ...s.card, marginBottom:8, padding:"10px 14px" }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", fontSize:12, color:"#8E8E93", marginBottom:4 }}>
+                      <span>👤 {r.maid}</span>
+                      <span>📅 {fmtDate(r.date)}</span>
+                    </div>
+                    {noLinen && <div style={{ fontSize:12, color:"#FF3B30" }}>⚠️ Нет белья</div>}
+                    {linenItems.map(([name, qty]) => (
+                      <div key={name} style={{ fontSize:11, color:"#555" }}>  {name} — {qty}</div>
+                    ))}
+                    {r.consumables?.trim() && <div style={{ fontSize:11, color:"#B8860B", marginTop:2 }}>🔔 {r.consumables}</div>}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
       </div>
     );
   }
