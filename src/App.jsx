@@ -309,13 +309,7 @@ export default function App() {
           {!online && <div style={s.offlinePill}>⚠️ Офлайн</div>}
           {pendingCount > 0 && <div style={s.pendingPill}>📱 {pendingCount} в очереди</div>}
           {online && pendingCount === 0 && <div style={{...s.syncPill, opacity: syncBanner ? 1 : 0}}>🔄 Сохранено</div>}
-          <button onClick={() => {
-            if (orderUnlocked) { setTab("task"); }
-            else {
-              const pw = prompt("Введите пароль:");
-              if (pw === SETTINGS_PASSWORD) { setOrderUnlocked(true); setTab("task"); }
-            }
-          }} style={{
+          <button onClick={() => setTab("task")} style={{
             background: tab === "task" ? "var(--accent)" : "var(--bg2)",
             color: tab === "task" ? "#fff" : "var(--accent)",
             border: tab === "task" ? "none" : "1.5px solid var(--accent)",
@@ -339,7 +333,11 @@ export default function App() {
           <LogTab addRecord={addRecord} apts={apts} maids={maids} linen={linen}/>
         </div>
         {tab==="history" && <HistoryTab records={records} deleteRecord={deleteRecord} updateRecord={updateRecord} linen={linen} maids={maids} apts={apts}/>}
-        {tab==="task" && <TaskTab apts={apts} linen={linen}/>}
+        {tab==="task" && (
+          orderUnlocked
+            ? <TaskTab apts={apts} linen={linen}/>
+            : <PasswordGate onUnlock={()=>setOrderUnlocked(true)} title="Order" subtitle="Введите пароль для доступа"/>
+        )}
         {tab==="settings" && (
           settingsUnlocked
             ? <SettingsTab apts={apts} saveApts={saveApts} maids={maids} saveMaids={saveMaids} linen={linen} saveLinen={saveLinen} theme={theme} saveTheme={saveTheme} bgTheme={bgTheme} saveBgTheme={saveBgTheme} bgImage={bgImage} saveBgImage={saveBgImage} onLock={()=>setSettingsUnlocked(false)}/>
@@ -351,7 +349,7 @@ export default function App() {
 }
 
 // ─── PASSWORD GATE ───────────────────────────────────────────────
-function PasswordGate({ onUnlock }) {
+function PasswordGate({ onUnlock, title, subtitle }) {
   const [val, setVal]     = useState("");
   const [err, setErr]     = useState(false);
   const [shake, setShake] = useState(false);
@@ -371,8 +369,8 @@ function PasswordGate({ onUnlock }) {
   return (
     <div style={{padding:"60px 32px 32px", textAlign:"center"}}>
       <div style={{fontSize:48, marginBottom:16}}>🔒</div>
-      <div style={{fontSize:17, fontWeight:600, marginBottom:6, color:"#1C1C1E"}}>Настройки защищены</div>
-      <div style={{fontSize:13, color:"#8E8E93", marginBottom:32}}>Введите пароль для доступа</div>
+      <div style={{fontSize:17, fontWeight:600, marginBottom:6, color:"#1C1C1E"}}>{title || "Настройки защищены"}</div>
+      <div style={{fontSize:13, color:"#8E8E93", marginBottom:32}}>{subtitle || "Введите пароль для доступа"}</div>
 
       <div style={{animation: shake ? "shake 0.4s ease" : "none", marginBottom:16}}>
         <style>{`@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}`}</style>
@@ -743,42 +741,44 @@ function HistoryTab({ records, deleteRecord, updateRecord, linen, maids, apts })
 
 // ─── TASK TAB (SUPERVISOR) ────────────────────────────────────────
 function TaskTab({ apts, linen }) {
-  const [selected, setSelected] = useState({});
+  const [orders, setOrders] = useState([]);
+  const [editingApt, setEditingApt] = useState(null);
+  const [editData, setEditData] = useState({ linen: {}, consumables: "" });
+  const [aptSearch, setAptSearch] = useState("");
   const [printMode, setPrintMode] = useState(false);
 
-  function toggleApt(apt) {
-    setSelected(prev => {
-      const copy = { ...prev };
-      if (copy[apt]) { delete copy[apt]; }
-      else { copy[apt] = { linen: {}, consumables: "" }; }
-      return copy;
-    });
+  const filteredApts = apts.filter(a => a.toLowerCase().includes(aptSearch.toLowerCase()));
+  const orderApts = orders.map(o => o.apt);
+
+  function addApt(apt) {
+    setEditingApt(apt);
+    const existing = orders.find(o => o.apt === apt);
+    setEditData(existing ? { linen: { ...existing.linen }, consumables: existing.consumables } : { linen: {}, consumables: "" });
+    setAptSearch("");
   }
 
-  function setLinenQty(apt, id, val) {
+  function setQty(id, val) {
     const num = val === "" ? "" : Math.max(0, parseInt(val) || 0);
-    setSelected(prev => ({
-      ...prev,
-      [apt]: { ...prev[apt], linen: { ...prev[apt].linen, [id]: num } }
-    }));
+    setEditData(prev => ({ ...prev, linen: { ...prev.linen, [id]: num } }));
   }
 
-  function setConsum(apt, val) {
-    setSelected(prev => ({
-      ...prev,
-      [apt]: { ...prev[apt], consumables: val }
-    }));
+  function saveAptOrder() {
+    const linenEntries = Object.entries(editData.linen).filter(([, v]) => parseInt(v) > 0);
+    if (linenEntries.length === 0 && !editData.consumables?.trim()) {
+      setEditingApt(null);
+      return;
+    }
+    setOrders(prev => {
+      const filtered = prev.filter(o => o.apt !== editingApt);
+      return [...filtered, { apt: editingApt, linen: editData.linen, consumables: editData.consumables }]
+        .sort((a, b) => a.apt.localeCompare(b.apt, "ru", { numeric: true }));
+    });
+    setEditingApt(null);
   }
 
-  function selectAll() {
-    const all = {};
-    apts.forEach(a => { all[a] = selected[a] || { linen: {}, consumables: "" }; });
-    setSelected(all);
+  function removeOrder(apt) {
+    setOrders(prev => prev.filter(o => o.apt !== apt));
   }
-
-  function clearAll() { setSelected({}); }
-
-  const selectedApts = Object.keys(selected).sort((a, b) => a.localeCompare(b, "ru", { numeric: true }));
 
   function handlePrint() {
     setPrintMode(true);
@@ -796,95 +796,107 @@ function TaskTab({ apts, linen }) {
             @page { margin: 8mm; size: A4; }
           }
         `}</style>
-        <div style={{ textAlign:"center", marginBottom:12, borderBottom:"2px solid #333", paddingBottom:8 }}>
-          <div style={{ fontSize:16, fontWeight:700 }}>📋 Задание на {fmtDate(today())}</div>
+        <div style={{ textAlign:"center", marginBottom:10, borderBottom:"2px solid #333", paddingBottom:6 }}>
+          <div style={{ fontSize:14, fontWeight:700 }}>Задание на {fmtDate(today())}</div>
         </div>
-        <div style={{ display:"grid", gridTemplateColumns: selectedApts.length > 3 ? "1fr 1fr" : "1fr", gap:8 }}>
-          {selectedApts.map(apt => {
-            const data = selected[apt];
-            const linenEntries = Object.entries(data.linen || {}).filter(([, v]) => parseInt(v) > 0);
-            const hasContent = linenEntries.length > 0 || data.consumables?.trim();
-            if (!hasContent) return null;
-            return (
-              <div key={apt} style={{ border:"1px solid #ccc", borderRadius:6, overflow:"hidden", breakInside:"avoid" }}>
-                <div style={{ background:"#eee", padding:"4px 10px", fontWeight:700, fontSize:12 }}>🏠 {apt}</div>
-                <div style={{ padding:"4px 10px" }}>
-                  {linenEntries.map(([id, qty]) => {
-                    const item = linen.find(l => l.id === id);
-                    return (
-                      <div key={id} style={{ display:"flex", justifyContent:"space-between", fontSize:11, padding:"2px 0", borderBottom:"1px solid #f0f0f0" }}>
-                        <span>{item ? `${item.icon} ${item.label}` : id}</span>
-                        <span style={{ fontWeight:600 }}>{qty}</span>
-                      </div>
-                    );
-                  })}
-                  {data.consumables?.trim() && (
-                    <div style={{ fontSize:10, color:"#B8860B", marginTop:3, paddingTop:2, borderTop:"1px dashed #ddd" }}>🔔 {data.consumables}</div>
-                  )}
+        {orders.map(({ apt, linen: ln, consumables }) => {
+          const items = Object.entries(ln).filter(([, v]) => parseInt(v) > 0);
+          if (items.length === 0 && !consumables?.trim()) return null;
+          const parts = items.map(([id, qty]) => {
+            const item = linen.find(l => l.id === id);
+            return `${item ? item.label : id} ×${qty}`;
+          });
+          if (consumables?.trim()) parts.push(consumables.trim());
+          return (
+            <div key={apt} style={{ fontSize:12, padding:"4px 0", borderBottom:"1px solid #ddd" }}>
+              <strong>{apt}:</strong> {parts.join(", ")}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  if (editingApt) {
+    return (
+      <div style={s.page}>
+        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}>
+          <button onClick={() => setEditingApt(null)} style={{ background:"none", border:"none", fontSize:20, cursor:"pointer", color:"var(--accent)", padding:0 }}>←</button>
+          <div style={{ fontSize:16, fontWeight:700 }}>🏠 {editingApt}</div>
+        </div>
+        <div style={s.sL}>Бельё</div>
+        <div style={s.card}>
+          <div style={{ padding:"8px 14px" }}>
+            {linen.map((item, i) => (
+              <div key={item.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"6px 0", borderBottom: i < linen.length - 1 ? "1px solid rgba(0,0,0,0.04)" : "none" }}>
+                <span style={{ fontSize:13 }}>{item.icon} {item.label}</span>
+                <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                  <button onClick={() => setQty(item.id, (parseInt(editData.linen[item.id]) || 0) - 1)} style={s.qtyBtn}>−</button>
+                  <input value={editData.linen[item.id] ?? ""} onChange={e => setQty(item.id, e.target.value)}
+                    style={{ ...s.qtyInput, width:40 }} inputMode="numeric"/>
+                  <button onClick={() => setQty(item.id, (parseInt(editData.linen[item.id]) || 0) + 1)} style={s.qtyBtn}>+</button>
                 </div>
               </div>
-            );
-          })}
+            ))}
+          </div>
         </div>
+        <div style={{ ...s.sL, marginTop:16 }}>Расходники</div>
+        <textarea value={editData.consumables} onChange={e => setEditData(prev => ({ ...prev, consumables: e.target.value }))}
+          placeholder="Туалетная бумага, кофе, чай..."
+          rows={2} style={{ ...s.input, resize:"none", fontSize:13 }}/>
+        <button onClick={saveAptOrder} style={{ ...s.saveBtn, marginTop:16 }}>
+          ✓ Добавить
+        </button>
       </div>
     );
   }
 
   return (
     <div style={s.page}>
-      <div style={s.sL}>Выберите квартиры</div>
-      <div style={{ display:"flex", gap:8, marginBottom:10 }}>
-        <button onClick={selectAll} style={{ ...s.clearBtn, color:"var(--accent)" }}>Выбрать все</button>
-        <button onClick={clearAll} style={{ ...s.clearBtn, color:"#FF3B30" }}>Очистить</button>
-      </div>
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:8, marginBottom:16 }}>
-        {apts.map(a => (
-          <button key={a} onClick={() => toggleApt(a)} style={{
-            padding:"10px 4px", borderRadius:12, border: selected[a] ? "2px solid var(--accent)" : brd,
-            background: selected[a] ? "var(--accent-dim)" : "var(--bg2)",
-            color: selected[a] ? "var(--accent-dark)" : "#1C1C1E",
-            fontWeight: selected[a] ? 600 : 500, fontSize:13, cursor:"pointer", fontFamily:"inherit", transition:"all 0.15s"
+      <div style={s.sL}>Добавить квартиру</div>
+      <input value={aptSearch} onChange={e => setAptSearch(e.target.value)}
+        placeholder="🔍 Поиск квартиры..."
+        style={{ ...s.input, marginBottom:10 }}/>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:8, marginBottom:16, maxHeight:180, overflowY:"auto" }}>
+        {filteredApts.filter(a => !orderApts.includes(a)).map(a => (
+          <button key={a} onClick={() => addApt(a)} style={{
+            padding:"10px 4px", borderRadius:12, border: brd,
+            background:"var(--bg2)", color:"#1C1C1E",
+            fontWeight:500, fontSize:13, cursor:"pointer", fontFamily:"inherit", transition:"all 0.15s"
           }}>{a}</button>
         ))}
       </div>
 
-      {selectedApts.length > 0 && <>
-        {selectedApts.map(apt => (
-          <div key={apt} style={{ ...s.card, marginBottom:12 }}>
-            <div style={{ padding:"10px 14px", fontWeight:600, fontSize:14, borderBottom:"1px solid rgba(0,0,0,0.04)", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-              <span>🏠 {apt}</span>
-              <button onClick={() => toggleApt(apt)} style={{ background:"none", border:"none", color:"#C7C7CC", cursor:"pointer", fontSize:14 }}>✕</button>
-            </div>
-            <div style={{ padding:"10px 14px" }}>
-              <div style={{ fontSize:11, color:"#8E8E93", fontWeight:600, letterSpacing:0.5, marginBottom:6 }}>БЕЛЬЁ</div>
-              {linen.map((item, i) => (
-                <div key={item.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"5px 0", borderBottom: i < linen.length - 1 ? "1px solid rgba(0,0,0,0.04)" : "none" }}>
-                  <span style={{ fontSize:13 }}>{item.icon} {item.label}</span>
-                  <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                    <button onClick={() => setLinenQty(apt, item.id, (parseInt(selected[apt]?.linen?.[item.id]) || 0) - 1)} style={s.qtyBtn}>−</button>
-                    <input value={selected[apt]?.linen?.[item.id] ?? ""} onChange={e => setLinenQty(apt, item.id, e.target.value)}
-                      style={{ ...s.qtyInput, width:40 }} inputMode="numeric"/>
-                    <button onClick={() => setLinenQty(apt, item.id, (parseInt(selected[apt]?.linen?.[item.id]) || 0) + 1)} style={s.qtyBtn}>+</button>
-                  </div>
+      {orders.length > 0 && <>
+        <div style={s.sL}>Добавлено ({orders.length})</div>
+        {orders.map(({ apt, linen: ln, consumables }) => {
+          const items = Object.entries(ln).filter(([, v]) => parseInt(v) > 0);
+          const summary = items.map(([id, qty]) => {
+            const item = linen.find(l => l.id === id);
+            return `${item ? item.icon : ""} ${qty}`;
+          }).join("  ");
+          return (
+            <div key={apt} style={{ ...s.card, marginBottom:8, padding:"10px 14px", display:"flex", alignItems:"center", gap:10 }}>
+              <div style={{ flex:1, minWidth:0 }} onClick={() => addApt(apt)}>
+                <div style={{ fontWeight:600, fontSize:14 }}>🏠 {apt}</div>
+                <div style={{ fontSize:11, color:"#8E8E93", marginTop:2, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+                  {summary}{consumables?.trim() ? ` 🔔` : ""}
                 </div>
-              ))}
-              <div style={{ fontSize:11, color:"#8E8E93", fontWeight:600, letterSpacing:0.5, marginBottom:6, marginTop:10 }}>РАСХОДНИКИ</div>
-              <textarea value={selected[apt]?.consumables || ""} onChange={e => setConsum(apt, e.target.value)}
-                placeholder="Туалетная бумага, кофе, чай..."
-                rows={2} style={{ ...s.input, resize:"none", fontSize:13 }}/>
+              </div>
+              <button onClick={() => removeOrder(apt)} style={{ background:"none", border:"none", color:"#C7C7CC", cursor:"pointer", fontSize:16 }}>✕</button>
             </div>
-          </div>
-        ))}
+          );
+        })}
 
-        <button onClick={handlePrint} style={s.saveBtn} className="no-print">
-          🖨️ Распечатать задание ({selectedApts.length} кв.)
+        <button onClick={handlePrint} style={{ ...s.saveBtn, marginTop:16 }} className="no-print">
+          🖨️ Печать ({orders.length} кв.)
         </button>
       </>}
 
-      {selectedApts.length === 0 && (
+      {orders.length === 0 && (
         <div style={s.empty}>
           <div style={{ fontSize:44, marginBottom:12 }}>📋</div>
-          <p style={{ margin:0, color:"#555" }}>Выберите квартиры для задания</p>
+          <p style={{ margin:0, color:"#555" }}>Выберите квартиры и заполните задание</p>
         </div>
       )}
     </div>
