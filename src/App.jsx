@@ -78,15 +78,17 @@ function compressImage(file, maxPx = 1200, quality = 0.6) {
         const h = Math.round(img.height * scale);
         const canvas = document.createElement("canvas");
         canvas.width = w; canvas.height = h;
-      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-      canvas.toBlob((blob) => {
-        resolve(blob); // Повертає файл (Blob)
-      }, "image/jpeg", 0.6);
+  canvas.getContext("2d").drawImage(img, 0, 0, w, h);
 
-      img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
+  canvas.toBlob((blob) => {
+    resolve(blob);
+  }, "image/jpeg", 0.6); // Ось тут ми виправили дужки
+  };
+  img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
   });
+
 }
 
 // ─── ROOT ────────────────────────────────────────────────────────
