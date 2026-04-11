@@ -101,6 +101,7 @@ export default function App() {
   const [maids, setMaids]     = useState(null);
   const [linen, setLinen]     = useState(null);
   const [settingsUnlocked, setSettingsUnlocked] = useState(false);
+  const [orderUnlocked, setOrderUnlocked] = useState(false);
   const [syncBanner, setSyncBanner] = useState(false);
   const [online, setOnline]   = useState(navigator.onLine);
   const [theme, setTheme]     = useState("blue");
@@ -308,10 +309,24 @@ export default function App() {
           {!online && <div style={s.offlinePill}>⚠️ Офлайн</div>}
           {pendingCount > 0 && <div style={s.pendingPill}>📱 {pendingCount} в очереди</div>}
           {online && pendingCount === 0 && <div style={{...s.syncPill, opacity: syncBanner ? 1 : 0}}>🔄 Сохранено</div>}
+          <button onClick={() => {
+            if (orderUnlocked) { setTab("task"); }
+            else {
+              const pw = prompt("Введите пароль:");
+              if (pw === SETTINGS_PASSWORD) { setOrderUnlocked(true); setTab("task"); }
+            }
+          }} style={{
+            background: tab === "task" ? "var(--accent)" : "var(--bg2)",
+            color: tab === "task" ? "#fff" : "var(--accent)",
+            border: tab === "task" ? "none" : "1.5px solid var(--accent)",
+            borderRadius: 10, padding: "6px 14px", fontFamily: "inherit",
+            fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",
+            transition: "all 0.2s", letterSpacing: 0.3
+          }}>📋 Order</button>
         </div>
 
         <div style={s.tabBar}>
-          {[["log","📝","Записать"],["history","🔍","История"],["task","📋","Задание"],["settings","⚙️","Настройки"]].map(([key,icon,label])=>(
+          {[["log","📝","Записать"],["history","🔍","История"],["settings","⚙️","Настройки"]].map(([key,icon,label])=>(
             <button key={key} onClick={()=>setTab(key)}
               style={{...s.tab,...(tab===key?s.tabActive:{})}}>
               <span style={{fontSize:18}}>{icon}</span>
