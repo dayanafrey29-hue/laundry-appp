@@ -311,7 +311,7 @@ export default function App() {
         </div>
 
         <div style={s.tabBar}>
-          {[["log","📝","Записать"],["history","🔍","История"],["settings","⚙️","Настройки"]].map(([key,icon,label])=>(
+          {[["log","📝","Записать"],["history","🔍","История"],["task","📋","Задание"],["settings","⚙️","Настройки"]].map(([key,icon,label])=>(
             <button key={key} onClick={()=>setTab(key)}
               style={{...s.tab,...(tab===key?s.tabActive:{})}}>
               <span style={{fontSize:18}}>{icon}</span>
@@ -324,6 +324,7 @@ export default function App() {
           <LogTab addRecord={addRecord} apts={apts} maids={maids} linen={linen}/>
         </div>
         {tab==="history" && <HistoryTab records={records} deleteRecord={deleteRecord} updateRecord={updateRecord} linen={linen} maids={maids} apts={apts}/>}
+        {tab==="task" && <TaskTab apts={apts} linen={linen}/>}
         {tab==="settings" && (
           settingsUnlocked
             ? <SettingsTab apts={apts} saveApts={saveApts} maids={maids} saveMaids={saveMaids} linen={linen} saveLinen={saveLinen} theme={theme} saveTheme={saveTheme} bgTheme={bgTheme} saveBgTheme={saveBgTheme} bgImage={bgImage} saveBgImage={saveBgImage} onLock={()=>setSettingsUnlocked(false)}/>
@@ -721,6 +722,159 @@ function HistoryTab({ records, deleteRecord, updateRecord, linen, maids, apts })
       }
       {delId && <Modal text="Удалить эту запись?" onCancel={()=>setDelId(null)} onConfirm={doDelete}/>}
       {lightbox && <PhotoLightbox src={lightbox} onClose={()=>setLightbox(null)}/>}
+    </div>
+  );
+}
+
+// ─── TASK TAB (SUPERVISOR) ────────────────────────────────────────
+function TaskTab({ apts, linen }) {
+  const [selected, setSelected] = useState({});
+  const [printMode, setPrintMode] = useState(false);
+
+  function toggleApt(apt) {
+    setSelected(prev => {
+      const copy = { ...prev };
+      if (copy[apt]) { delete copy[apt]; }
+      else { copy[apt] = { linen: {}, consumables: "" }; }
+      return copy;
+    });
+  }
+
+  function setLinenQty(apt, id, val) {
+    const num = val === "" ? "" : Math.max(0, parseInt(val) || 0);
+    setSelected(prev => ({
+      ...prev,
+      [apt]: { ...prev[apt], linen: { ...prev[apt].linen, [id]: num } }
+    }));
+  }
+
+  function setConsum(apt, val) {
+    setSelected(prev => ({
+      ...prev,
+      [apt]: { ...prev[apt], consumables: val }
+    }));
+  }
+
+  function selectAll() {
+    const all = {};
+    apts.forEach(a => { all[a] = selected[a] || { linen: {}, consumables: "" }; });
+    setSelected(all);
+  }
+
+  function clearAll() { setSelected({}); }
+
+  const selectedApts = Object.keys(selected).sort((a, b) => a.localeCompare(b, "ru", { numeric: true }));
+
+  function handlePrint() {
+    setPrintMode(true);
+    setTimeout(() => { window.print(); setPrintMode(false); }, 300);
+  }
+
+  if (printMode) {
+    return (
+      <div className="print-sheet" style={{ padding:20, fontFamily:"'Inter',sans-serif", color:"#1C1C1E" }}>
+        <style>{`
+          @media print {
+            body > div > div { box-shadow:none!important; border-radius:0!important; margin:0!important; max-width:100%!important; }
+            .no-print { display:none!important; }
+            .print-sheet { padding:0!important; }
+          }
+        `}</style>
+        <div style={{ textAlign:"center", marginBottom:20 }}>
+          <div style={{ fontSize:20, fontWeight:700 }}>📋 Задание — {fmtDate(today())}</div>
+        </div>
+        {selectedApts.map(apt => {
+          const data = selected[apt];
+          const linenEntries = Object.entries(data.linen || {}).filter(([, v]) => parseInt(v) > 0);
+          const hasContent = linenEntries.length > 0 || data.consumables?.trim();
+          if (!hasContent) return null;
+          return (
+            <div key={apt} style={{ marginBottom:16, border:"1px solid #ddd", borderRadius:10, overflow:"hidden" }}>
+              <div style={{ background:"#F0F0F5", padding:"8px 14px", fontWeight:700, fontSize:15 }}>🏠 {apt}</div>
+              <div style={{ padding:"10px 14px" }}>
+                {linenEntries.length > 0 && (
+                  <table style={{ width:"100%", borderCollapse:"collapse", marginBottom: data.consumables?.trim() ? 8 : 0 }}>
+                    <tbody>
+                      {linenEntries.map(([id, qty]) => {
+                        const item = linen.find(l => l.id === id);
+                        return (
+                          <tr key={id} style={{ borderBottom:"1px solid #eee" }}>
+                            <td style={{ padding:"4px 0", fontSize:13 }}>{item ? `${item.icon} ${item.label}` : id}</td>
+                            <td style={{ padding:"4px 0", fontSize:13, fontWeight:600, textAlign:"right", width:50 }}>{qty}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+                {data.consumables?.trim() && (
+                  <div style={{ fontSize:12, color:"#B8860B", marginTop:4 }}>🔔 {data.consumables}</div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  return (
+    <div style={s.page}>
+      <div style={s.sL}>Выберите квартиры</div>
+      <div style={{ display:"flex", gap:8, marginBottom:10 }}>
+        <button onClick={selectAll} style={{ ...s.clearBtn, color:"var(--accent)" }}>Выбрать все</button>
+        <button onClick={clearAll} style={{ ...s.clearBtn, color:"#FF3B30" }}>Очистить</button>
+      </div>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:8, marginBottom:16 }}>
+        {apts.map(a => (
+          <button key={a} onClick={() => toggleApt(a)} style={{
+            padding:"10px 4px", borderRadius:12, border: selected[a] ? "2px solid var(--accent)" : brd,
+            background: selected[a] ? "var(--accent-dim)" : "var(--bg2)",
+            color: selected[a] ? "var(--accent-dark)" : "#1C1C1E",
+            fontWeight: selected[a] ? 600 : 500, fontSize:13, cursor:"pointer", fontFamily:"inherit", transition:"all 0.15s"
+          }}>{a}</button>
+        ))}
+      </div>
+
+      {selectedApts.length > 0 && <>
+        {selectedApts.map(apt => (
+          <div key={apt} style={{ ...s.card, marginBottom:12 }}>
+            <div style={{ padding:"10px 14px", fontWeight:600, fontSize:14, borderBottom:"1px solid rgba(0,0,0,0.04)", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <span>🏠 {apt}</span>
+              <button onClick={() => toggleApt(apt)} style={{ background:"none", border:"none", color:"#C7C7CC", cursor:"pointer", fontSize:14 }}>✕</button>
+            </div>
+            <div style={{ padding:"10px 14px" }}>
+              <div style={{ fontSize:11, color:"#8E8E93", fontWeight:600, letterSpacing:0.5, marginBottom:6 }}>БЕЛЬЁ</div>
+              {linen.map((item, i) => (
+                <div key={item.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"5px 0", borderBottom: i < linen.length - 1 ? "1px solid rgba(0,0,0,0.04)" : "none" }}>
+                  <span style={{ fontSize:13 }}>{item.icon} {item.label}</span>
+                  <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                    <button onClick={() => setLinenQty(apt, item.id, (parseInt(selected[apt]?.linen?.[item.id]) || 0) - 1)} style={s.qtyBtn}>−</button>
+                    <input value={selected[apt]?.linen?.[item.id] ?? ""} onChange={e => setLinenQty(apt, item.id, e.target.value)}
+                      style={{ ...s.qtyInput, width:40 }} inputMode="numeric"/>
+                    <button onClick={() => setLinenQty(apt, item.id, (parseInt(selected[apt]?.linen?.[item.id]) || 0) + 1)} style={s.qtyBtn}>+</button>
+                  </div>
+                </div>
+              ))}
+              <div style={{ fontSize:11, color:"#8E8E93", fontWeight:600, letterSpacing:0.5, marginBottom:6, marginTop:10 }}>РАСХОДНИКИ</div>
+              <textarea value={selected[apt]?.consumables || ""} onChange={e => setConsum(apt, e.target.value)}
+                placeholder="Туалетная бумага, кофе, чай..."
+                rows={2} style={{ ...s.input, resize:"none", fontSize:13 }}/>
+            </div>
+          </div>
+        ))}
+
+        <button onClick={handlePrint} style={s.saveBtn} className="no-print">
+          🖨️ Распечатать задание ({selectedApts.length} кв.)
+        </button>
+      </>}
+
+      {selectedApts.length === 0 && (
+        <div style={s.empty}>
+          <div style={{ fontSize:44, marginBottom:12 }}>📋</div>
+          <p style={{ margin:0, color:"#555" }}>Выберите квартиры для задания</p>
+        </div>
+      )}
     </div>
   );
 }
