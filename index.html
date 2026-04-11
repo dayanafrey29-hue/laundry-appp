@@ -14,13 +14,11 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
     <style>
+      #tca-print-zone { display:none; }
       @media print {
-        * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
         body, html { background:#fff!important; margin:0!important; padding:0!important; }
-        #root > div > div { box-shadow:none!important; border-radius:0!important; margin:0!important; padding:0!important; max-width:100%!important; width:100%!important; min-height:auto!important; }
-        #root > div { background:#fff!important; }
-        .tca-root > *:not(.print-sheet) { display:none!important; }
-        .print-sheet { display:block!important; padding:10px!important; }
+        #root { display:none!important; }
+        #tca-print-zone { display:block!important; padding:10px; font-family:'Inter',sans-serif; color:#000; }
         @page { margin:8mm; size:A4; }
       }
     </style>

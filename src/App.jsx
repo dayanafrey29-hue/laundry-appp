@@ -102,7 +102,6 @@ export default function App() {
   const [linen, setLinen]     = useState(null);
   const [settingsUnlocked, setSettingsUnlocked] = useState(false);
   const [orderUnlocked, setOrderUnlocked] = useState(false);
-  const [printPortal, setPrintPortal] = useState(null);
   const [syncBanner, setSyncBanner] = useState(false);
   const [online, setOnline]   = useState(navigator.onLine);
   const [theme, setTheme]     = useState("blue");
@@ -336,10 +335,9 @@ export default function App() {
         {tab==="history" && <HistoryTab records={records} deleteRecord={deleteRecord} updateRecord={updateRecord} linen={linen} maids={maids} apts={apts}/>}
         {tab==="task" && (
           orderUnlocked
-            ? <TaskTab apts={apts} linen={linen} renderPrintInPortal={node => setPrintPortal(node)} syncKey={syncKey}/>
+            ? <TaskTab apts={apts} linen={linen} syncKey={syncKey}/>
             : <PasswordGate onUnlock={()=>setOrderUnlocked(true)} title="Order" subtitle="Введите пароль для доступа"/>
         )}
-        {printPortal}
         {tab==="settings" && (
           settingsUnlocked
             ? <SettingsTab apts={apts} saveApts={saveApts} maids={maids} saveMaids={saveMaids} linen={linen} saveLinen={saveLinen} theme={theme} saveTheme={saveTheme} bgTheme={bgTheme} saveBgTheme={saveBgTheme} bgImage={bgImage} saveBgImage={saveBgImage} onLock={()=>setSettingsUnlocked(false)}/>
@@ -742,7 +740,24 @@ function HistoryTab({ records, deleteRecord, updateRecord, linen, maids, apts })
 }
 
 // ─── TASK TAB (SUPERVISOR) ────────────────────────────────────────
-function TaskTab({ apts, linen, renderPrintInPortal, syncKey }) {
+function doPrint(html) {
+  let el = document.getElementById('tca-print-zone');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'tca-print-zone';
+    el.className = 'print-sheet';
+    document.body.appendChild(el);
+  }
+  el.innerHTML = html;
+  el.style.display = 'block';
+  setTimeout(() => {
+    window.print();
+    el.style.display = 'none';
+    el.innerHTML = '';
+  }, 200);
+}
+
+function TaskTab({ apts, linen, syncKey }) {
   const [orders, setOrders] = useState([]);
   const [orderDate, setOrderDate] = useState(today());
   const [editingApt, setEditingApt] = useState(null);
@@ -804,63 +819,32 @@ function TaskTab({ apts, linen, renderPrintInPortal, syncKey }) {
     if (historyDetail?.id === id) setHistoryDetail(null);
   }
 
+  function buildPrintHtml(date, itemsList) {
+    let html = `<div style="text-align:center;margin-bottom:12px;border-bottom:2px solid #000;padding-bottom:6px"><div style="font-size:14px;font-weight:700">Задание на ${fmtDate(date)}</div></div>`;
+    for (const { apt, linen: ln, consumables } of itemsList) {
+      const items = Object.entries(ln).filter(([, v]) => parseInt(v) > 0);
+      const consParts = consumables?.trim() ? consumables.trim().split(/[,;]+/).map(c => c.trim()).filter(Boolean) : [];
+      if (items.length === 0 && consParts.length === 0) continue;
+      html += `<div style="margin-bottom:10px"><div style="font-size:13px;font-weight:700">${apt}:</div>`;
+      for (const [id, qty] of items) {
+        const item = linen.find(l => l.id === id);
+        html += `<div style="font-size:12px;padding-left:12px">— ${item ? item.label : id} ${qty}</div>`;
+      }
+      for (const c of consParts) {
+        html += `<div style="font-size:12px;padding-left:12px">— ${c}</div>`;
+      }
+      html += `</div>`;
+    }
+    return html;
+  }
+
   function handlePrint() {
     saveToHistory();
-    const printContent = (
-      <div className="print-sheet" style={{ padding:10, fontFamily:"'Inter',sans-serif", color:"#000" }}>
-        <div style={{ textAlign:"center", marginBottom:12, borderBottom:"2px solid #000", paddingBottom:6 }}>
-          <div style={{ fontSize:14, fontWeight:700 }}>Задание на {fmtDate(orderDate)}</div>
-        </div>
-        {orders.map(({ apt, linen: ln, consumables }) => {
-          const items = Object.entries(ln).filter(([, v]) => parseInt(v) > 0);
-          const consParts = consumables?.trim() ? consumables.trim().split(/[,;]+/).map(c => c.trim()).filter(Boolean) : [];
-          if (items.length === 0 && consParts.length === 0) return null;
-          return (
-            <div key={apt} style={{ marginBottom:10 }}>
-              <div style={{ fontSize:13, fontWeight:700 }}>{apt}:</div>
-              {items.map(([id, qty]) => {
-                const item = linen.find(l => l.id === id);
-                return <div key={id} style={{ fontSize:12, paddingLeft:12 }}>— {item ? item.label : id} {qty}</div>;
-              })}
-              {consParts.map((c, i) => (
-                <div key={i} style={{ fontSize:12, paddingLeft:12 }}>— {c}</div>
-              ))}
-            </div>
-          );
-        })}
-      </div>
-    );
-    renderPrintInPortal(printContent);
-    setTimeout(() => { window.print(); renderPrintInPortal(null); }, 300);
+    doPrint(buildPrintHtml(orderDate, orders));
   }
 
   function reprintFromHistory(entry) {
-    const printContent = (
-      <div className="print-sheet" style={{ padding:10, fontFamily:"'Inter',sans-serif", color:"#000" }}>
-        <div style={{ textAlign:"center", marginBottom:12, borderBottom:"2px solid #000", paddingBottom:6 }}>
-          <div style={{ fontSize:14, fontWeight:700 }}>Задание на {fmtDate(entry.date)}</div>
-        </div>
-        {entry.items.map(({ apt, linen: ln, consumables }) => {
-          const items = Object.entries(ln).filter(([, v]) => parseInt(v) > 0);
-          const consParts = consumables?.trim() ? consumables.trim().split(/[,;]+/).map(c => c.trim()).filter(Boolean) : [];
-          if (items.length === 0 && consParts.length === 0) return null;
-          return (
-            <div key={apt} style={{ marginBottom:10 }}>
-              <div style={{ fontSize:13, fontWeight:700 }}>{apt}:</div>
-              {items.map(([id, qty]) => {
-                const item = linen.find(l => l.id === id);
-                return <div key={id} style={{ fontSize:12, paddingLeft:12 }}>— {item ? item.label : id} {qty}</div>;
-              })}
-              {consParts.map((c, i) => (
-                <div key={i} style={{ fontSize:12, paddingLeft:12 }}>— {c}</div>
-              ))}
-            </div>
-          );
-        })}
-      </div>
-    );
-    renderPrintInPortal(printContent);
-    setTimeout(() => { window.print(); renderPrintInPortal(null); }, 300);
+    doPrint(buildPrintHtml(entry.date, entry.items));
   }
 
   if (historyDetail) {
