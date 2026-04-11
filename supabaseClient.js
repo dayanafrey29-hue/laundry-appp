@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = 'https://cpeqwyswrpaiilbbpbrm.supabase.co'
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNwZXF3eXN3cnBhaWlsYmJwYnJtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU4Mjc0MTEsImV4cCI6MjA5MTQwMzQxMX0.dF4v7N5FnZWN4Qan8jigWorIVK9b7f3wKEQgeFaONLY'
+// Vite використовує import.meta.env для доступу до змінних
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-export const supabase = createClient(supabaseUrl, supabaseKey)
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)
