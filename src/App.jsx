@@ -769,40 +769,6 @@ function SettingsTab({ apts, saveApts, maids, saveMaids, linen, saveLinen, theme
           ))}
         </div>
 
-        <div style={s.sL}>🖼 Фото на фоне</div>
-        <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
-          <label style={{display:"inline-flex",alignItems:"center",gap:8,padding:"10px 16px",background:"var(--accent-dim)",border:`1.5px solid var(--accent)`,borderRadius:12,cursor:"pointer",fontSize:13,fontWeight:500,color:"var(--accent-dark)",fontFamily:"inherit"}}>
-            📷 {bgImage ? "Заменить" : "Выбрать фото"}
-            <input type="file" accept="image/*" style={{display:"none"}} onChange={e=>{
-              const file=e.target.files?.[0]; if(!file)return;
-              const reader=new FileReader();
-              reader.onload=()=>{
-                const img=new Image();
-                img.onload=()=>{
-                  const c=document.createElement("canvas");
-                  const max=800; let w=img.width,h=img.height;
-                  if(w>max||h>max){const r=Math.min(max/w,max/h);w*=r;h*=r;}
-                  c.width=w;c.height=h;
-                  c.getContext("2d").drawImage(img,0,0,w,h);
-                  saveBgImage(c.toDataURL("image/jpeg",0.6));
-                };
-                img.src=reader.result;
-              };
-              reader.readAsDataURL(file);
-              e.target.value="";
-            }}/>
-          </label>
-          {bgImage && (
-            <button onClick={()=>saveBgImage("")} style={{padding:"10px 16px",background:"var(--bg2)",border:brd,borderRadius:12,cursor:"pointer",fontSize:13,fontWeight:500,color:"#FF3B30",fontFamily:"inherit"}}>
-              ✕ Убрать
-            </button>
-          )}
-        </div>
-        {bgImage && (
-          <div style={{marginTop:10,borderRadius:12,overflow:"hidden",border:brd,height:80}}>
-            <img src={bgImage} alt="" style={{width:"100%",height:"100%",objectFit:"cover",filter:"blur(8px) brightness(0.95)",transform:"scale(1.1)"}}/>
-          </div>
-        )}
       </div>
     );
   }
